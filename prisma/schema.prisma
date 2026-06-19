@@ -1,0 +1,703 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum ActivityStatus {
+  not_started
+  ready_to_start
+  in_progress
+  paused
+  finished
+}
+
+enum ActivityType {
+  forest
+  city
+  beach
+}
+
+enum ActivityVisibility {
+  private
+  public
+}
+
+enum ActivityInvitationStatus {
+  pending
+  accepted
+  refused
+}
+
+enum FriendRequestStatus {
+  pending
+  accepted
+  refused
+}
+
+enum ContentType {
+  formation
+  module
+  lesson
+}
+
+enum DocumentType {
+  invoice
+  prescription
+}
+
+enum DogDominance {
+  neutral
+  dominant
+  dominated
+}
+
+enum DogSex {
+  male
+  female
+}
+
+enum PurchaseStatus {
+  pending
+  completed
+  failed
+}
+
+// ---------------------------------------------------------------------------
+// Users & auth
+// ---------------------------------------------------------------------------
+
+model Role {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  users     User[]
+
+  @@map("roles")
+}
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  refreshToken  String?  @map("refresh_token")
+  roleId        Int      @default(1) @map("role_id")
+  firstName     String?  @map("first_name") @db.VarChar(100)
+  lastName      String?  @map("last_name") @db.VarChar(100)
+  age           Int?
+  place         String?  @db.VarChar(100)
+  description   String?  @db.VarChar(500)
+  onBoarding    Boolean  @default(true) @map("on_boarding")
+  expoPushToken String?  @map("expo_push_token")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  role                    Role                     @relation(fields: [roleId], references: [id])
+  customer                Customer?
+  dogs                    Dog[]
+  createdActivities       Activity[]               @relation("ActivityCreator")
+  userActivities          UserActivity[]
+  activityStats           ActivityStats[]
+  sentInvitations         ActivityInvitation[]     @relation("InvitationSender")
+  receivedInvitations     ActivityInvitation[]     @relation("InvitationReceiver")
+  sentFriendRequests      FriendRequest[]          @relation("FriendRequestSender")
+  receivedFriendRequests  FriendRequest[]          @relation("FriendRequestRecipient")
+  friendshipsAsUser       Friendship[]             @relation("FriendshipUser")
+  friendshipsAsFriend     Friendship[]             @relation("FriendshipFriend")
+  conversationParticipants ConversationParticipant[]
+  messages                Message[]
+  userMeetingsAsUser      UserMeeting[]            @relation("MeetingUser")
+  userMeetingsAsMet       UserMeeting[]            @relation("MeetingMetUser")
+  userProgress            UserProgress[]
+  userPurchases           UserPurchase[]
+  opinions                Opinion[]
+  userStats               UserStats?
+  userStatsHistory        UserStatsHistory[]
+  userBadges              UserBadge[]
+  formationFavorites      FormationFavorite[]
+  activityLivePushTokens  ActivityLivePushToken[]
+
+  @@map("users")
+}
+
+model Customer {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @unique @map("user_id") @db.Uuid
+  stripeCustomerId String?  @map("stripe_customer_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("customers")
+}
+
+// ---------------------------------------------------------------------------
+// Dogs
+// ---------------------------------------------------------------------------
+
+model Breed {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  dogs      Dog[]
+
+  @@map("breeds")
+}
+
+model Behavior {
+  id           Int           @id @default(autoincrement())
+  name         String        @unique @db.VarChar(50)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  dogBehaviors DogBehavior[]
+
+  @@map("behavior")
+}
+
+model Dog {
+  id          String        @id @default(uuid()) @db.Uuid
+  ownerId     String        @map("owner_id") @db.Uuid
+  name        String        @db.VarChar(50)
+  description String?       @db.VarChar(200)
+  dominance   DogDominance?
+  sex         DogSex
+  age         Int
+  breedId     Int           @map("breed_id")
+  image       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  owner        User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  breed        Breed           @relation(fields: [breedId], references: [id])
+  dogBehaviors DogBehavior[]
+  measurements DogMeasurement[]
+  vaccinations Vaccination[]
+  documents    Document[]
+  healthReminders HealthReminder[]
+
+  @@index([ownerId])
+  @@map("dogs")
+}
+
+model DogBehavior {
+  id         Int      @id @default(autoincrement())
+  dogId      String   @map("dog_id") @db.Uuid
+  behaviorId Int      @map("behavior_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  dog      Dog      @relation(fields: [dogId], references: [id], onDelete: Cascade)
+  behavior Behavior @relation(fields: [behaviorId], references: [id])
+
+  @@unique([dogId, behaviorId])
+  @@map("dog_behaviors")
+}
+
+model DogMeasurement {
+  id        BigInt   @id @default(autoincrement())
+  dogId     String   @map("dog_id") @db.Uuid
+  date      DateTime
+  height    Float?
+  weight    Float?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  dog Dog @relation(fields: [dogId], references: [id], onDelete: Cascade)
+
+  @@map("dog_measurements")
+}
+
+// ---------------------------------------------------------------------------
+// Activities
+// ---------------------------------------------------------------------------
+
+model Activity {
+  id               String             @id @default(uuid()) @db.Uuid
+  creatorId        String             @map("creator_id") @db.Uuid
+  place            String?            @db.VarChar(50)
+  visibility       ActivityVisibility
+  type             ActivityType
+  date             DateTime
+  duration         String?            @db.VarChar(50)
+  status           ActivityStatus     @default(not_started)
+  participantLimit Int?               @map("participant_limit")
+  latitude         String?
+  longitude        String?
+  department       String?
+  country          String?
+  geohash          String?
+  startedAt        DateTime?          @map("started_at")
+  endedAt          DateTime?          @map("ended_at")
+  currentState     Json?              @default("{\"is_active\": false, \"started_by\": null, \"participants_ready\": []}") @map("current_state")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  creator     User                 @relation("ActivityCreator", fields: [creatorId], references: [id])
+  invitations ActivityInvitation[]
+  userActivities UserActivity[]
+  steps       Step[]
+  stats       ActivityStats[]
+
+  @@index([creatorId])
+  @@index([geohash])
+  @@map("activities")
+}
+
+model ActivityInvitation {
+  id         BigInt                   @id @default(autoincrement())
+  senderId   String                   @map("sender_id") @db.Uuid
+  receiverId String                   @map("receiver_id") @db.Uuid
+  activityId String                   @map("activity_id") @db.Uuid
+  status     ActivityInvitationStatus @default(pending)
+  createdAt  DateTime                 @default(now()) @map("created_at")
+  updatedAt  DateTime                 @updatedAt @map("updated_at")
+
+  sender   User     @relation("InvitationSender", fields: [senderId], references: [id])
+  receiver User     @relation("InvitationReceiver", fields: [receiverId], references: [id])
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@map("activity_invitations")
+}
+
+model UserActivity {
+  id         BigInt   @id @default(autoincrement())
+  userId     String   @map("user_id") @db.Uuid
+  activityId String   @map("activity_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, activityId])
+  @@map("user_activities")
+}
+
+model Step {
+  id         BigInt   @id @default(autoincrement())
+  activityId String   @map("activity_id") @db.Uuid
+  latitude   Float
+  longitude  Float
+  timestamp  DateTime
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@map("steps")
+}
+
+model ActivityStats {
+  id                   String    @id @default(uuid()) @db.Uuid
+  activityId           String?   @map("activity_id") @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  distanceKm           Decimal?  @default(0) @map("distance_km") @db.Decimal(10, 3)
+  durationMinutes      Int?      @default(0) @map("duration_minutes")
+  actualStartTime      DateTime? @map("actual_start_time")
+  actualEndTime        DateTime? @map("actual_end_time")
+  averageSpeedKmh      Decimal?  @map("average_speed_kmh") @db.Decimal(5, 2)
+  maxSpeedKmh          Decimal?  @map("max_speed_kmh") @db.Decimal(5, 2)
+  elevationGainMeters  Int?      @default(0) @map("elevation_gain_meters")
+  elevationLossMeters  Int?      @default(0) @map("elevation_loss_meters")
+  stepsCount           Int?      @map("steps_count")
+  caloriesBurned       Int?      @map("calories_burned")
+  routePoints          Json?     @map("route_points")
+  pauseDurationMinutes Int?      @default(0) @map("pause_duration_minutes")
+  movingTimeMinutes    Int?      @map("moving_time_minutes")
+  weatherCondition     String?   @map("weather_condition") @db.VarChar(50)
+  temperatureCelsius   Decimal?  @map("temperature_celsius") @db.Decimal(4, 1)
+  isCompleted          Boolean?  @default(false) @map("is_completed")
+  syncedToUserStats    Boolean?  @default(false) @map("synced_to_user_stats")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  activity Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, userId])
+  @@map("activity_stats")
+}
+
+model ActivityLivePushToken {
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @map("user_id") @db.Uuid
+  activityId String  @map("activity_id") @db.Uuid
+  pushToken String   @map("push_token")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, activityId])
+  @@map("activity_live_push_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Messaging
+// ---------------------------------------------------------------------------
+
+model Conversation {
+  id        BigInt   @id @default(autoincrement())
+  title     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             BigInt   @id @default(autoincrement())
+  conversationId BigInt   @map("conversation_id")
+  userId         String   @map("user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             BigInt   @id @default(autoincrement())
+  conversationId BigInt   @map("conversation_id")
+  senderId       String   @map("sender_id") @db.Uuid
+  content        String   @default("")
+  isRead         Boolean? @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ---------------------------------------------------------------------------
+// Social
+// ---------------------------------------------------------------------------
+
+model FriendRequest {
+  id          BigInt              @id @default(autoincrement())
+  senderId    String              @map("sender_id") @db.Uuid
+  recipientId String              @map("recipient_id") @db.Uuid
+  status      FriendRequestStatus @default(pending)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  sender    User @relation("FriendRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("FriendRequestRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@map("friend_requests")
+}
+
+model Friendship {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  friendId  String   @map("friend_id") @db.Uuid
+  status    String   @default("accepted") @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User @relation("FriendshipUser", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendshipFriend", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@map("friendships")
+}
+
+model UserMeeting {
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @map("user_id") @db.Uuid
+  metUserId String   @map("met_user_id") @db.Uuid
+  activityId String? @map("activity_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User @relation("MeetingUser", fields: [userId], references: [id], onDelete: Cascade)
+  metUser User @relation("MeetingMetUser", fields: [metUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, metUserId])
+  @@map("user_meetings")
+}
+
+// ---------------------------------------------------------------------------
+// Health
+// ---------------------------------------------------------------------------
+
+model Vaccination {
+  id        BigInt   @id @default(autoincrement())
+  dogId     String   @map("dog_id") @db.Uuid
+  name      String
+  date      DateTime
+  createdAt DateTime @default(now()) @map("created_at")
+
+  dog Dog @relation(fields: [dogId], references: [id], onDelete: Cascade)
+
+  @@map("vaccinations")
+}
+
+model Document {
+  id           BigInt       @id @default(autoincrement())
+  dogId        String       @map("dog_id") @db.Uuid
+  fileName     String?      @map("file_name")
+  documentType DocumentType @map("document_type")
+  place        String?
+  reason       String?
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  dog Dog @relation(fields: [dogId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+model HealthReminder {
+  id        BigInt   @id @default(autoincrement())
+  dogId     String   @map("dog_id") @db.Uuid
+  title     String
+  date      DateTime
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  dog Dog @relation(fields: [dogId], references: [id], onDelete: Cascade)
+
+  @@map("health_reminders")
+}
+
+// ---------------------------------------------------------------------------
+// Formations
+// ---------------------------------------------------------------------------
+
+model Formation {
+  id            Int      @id @default(autoincrement())
+  name          String
+  animatorName  String   @map("animator_name")
+  price         Int
+  description   String
+  stripeItemId  BigInt?  @map("stripe_item_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  modules   Module[]
+  opinions  Opinion[]
+  favorites FormationFavorite[]
+
+  @@map("formations")
+}
+
+model Module {
+  id           BigInt   @id @default(autoincrement())
+  formationId  Int      @map("formation_id")
+  name         String
+  description  String?
+  duration     String?
+  price        Float?
+  stripeItemId BigInt?  @map("stripe_item_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  formation       Formation        @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  lessons         Lesson[]
+  moduleMaterials ModuleMaterial[]
+
+  @@map("modules")
+}
+
+model Lesson {
+  id        BigInt   @id @default(autoincrement())
+  moduleId  BigInt   @map("module_id")
+  title     String
+  order     Int?     @map("order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  module      Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  lessonSteps LessonStep[]
+
+  @@map("lessons")
+}
+
+model LessonStep {
+  id        BigInt   @id @default(autoincrement())
+  lessonId  BigInt   @map("lesson_id")
+  content   String?
+  order     Int      @map("order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("lesson_steps")
+}
+
+model Material {
+  id        BigInt   @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  moduleMaterials ModuleMaterial[]
+
+  @@map("materials")
+}
+
+model ModuleMaterial {
+  id         BigInt   @id @default(autoincrement())
+  moduleId   BigInt?  @map("module_id")
+  materialId BigInt?  @map("material_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  module   Module?   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  material Material? @relation(fields: [materialId], references: [id])
+
+  @@map("module_materials")
+}
+
+model Opinion {
+  id          BigInt   @id @default(autoincrement())
+  formationId Int      @map("formation_id")
+  userId      String   @map("user_id") @db.Uuid
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  formation Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("opinions")
+}
+
+model UserProgress {
+  id          BigInt      @id @default(autoincrement())
+  userId      String      @map("user_id") @db.Uuid
+  contentType ContentType @map("content_type")
+  contentId   BigInt      @map("content_id")
+  completed   Boolean     @default(false)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_progress")
+}
+
+model UserPurchase {
+  id              BigInt         @id @default(autoincrement())
+  userId          String         @map("user_id") @db.Uuid
+  productId       String         @map("product_id")
+  priceId         String?        @map("price_id")
+  paymentIntentId String?        @map("payment_intent_id")
+  status          PurchaseStatus @default(pending)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_purchases")
+}
+
+model FormationFavorite {
+  id          BigInt   @id @default(autoincrement())
+  userId      String   @map("user_id") @db.Uuid
+  formationId Int      @map("formation_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  formation Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, formationId])
+  @@map("formation_favorites")
+}
+
+// ---------------------------------------------------------------------------
+// Stats & badges
+// ---------------------------------------------------------------------------
+
+model UserStats {
+  id                    String   @id @default(uuid()) @db.Uuid
+  userId                String   @unique @map("user_id") @db.Uuid
+  totalDistanceKm       Decimal? @default(0) @map("total_distance_km") @db.Decimal(12, 3)
+  totalActivities       Int?     @default(0) @map("total_activities")
+  totalDurationMinutes  Int?     @default(0) @map("total_duration_minutes")
+  currentStreak         Int?     @default(0) @map("current_streak")
+  longestStreak         Int?     @default(0) @map("longest_streak")
+  monthlyDistanceKm     Decimal? @default(0) @map("monthly_distance_km") @db.Decimal(12, 3)
+  monthlyActivities     Int?     @default(0) @map("monthly_activities")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_stats")
+}
+
+model UserStatsHistory {
+  id               BigInt   @id @default(autoincrement())
+  userId           String   @map("user_id") @db.Uuid
+  snapshotDate     DateTime @map("snapshot_date")
+  totalDistanceKm  Decimal? @map("total_distance_km") @db.Decimal(12, 3)
+  totalActivities  Int?     @map("total_activities")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_stats_history")
+}
+
+model BadgeCategory {
+  id           String  @id @default(uuid()) @db.Uuid
+  code         String  @unique @db.VarChar(50)
+  nameKey      String  @map("name_key") @db.VarChar(100)
+  icon         String? @db.VarChar(50)
+  color        String? @db.VarChar(7)
+  displayOrder Int?    @default(0) @map("display_order")
+  isActive     Boolean @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  badges Badge[]
+
+  @@map("badge_categories")
+}
+
+model Badge {
+  id               String  @id @default(uuid()) @db.Uuid
+  categoryId       String? @map("category_id") @db.Uuid
+  code             String  @unique @db.VarChar(50)
+  nameKey          String  @map("name_key") @db.VarChar(100)
+  descriptionKey   String  @map("description_key") @db.VarChar(100)
+  icon             String? @db.VarChar(50)
+  points           Int
+  requirementType  String? @map("requirement_type") @db.VarChar(50)
+  requirementValue Decimal? @map("requirement_value") @db.Decimal
+  requirementUnit  String? @map("requirement_unit") @db.VarChar(20)
+  isSecret         Boolean @default(false) @map("is_secret")
+  rarity           String? @db.VarChar(20)
+  displayOrder     Int?    @default(0) @map("display_order")
+  isActive         Boolean @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  category   BadgeCategory? @relation(fields: [categoryId], references: [id])
+  userBadges UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @map("user_id") @db.Uuid
+  badgeId   String   @map("badge_id") @db.Uuid
+  earnedAt  DateTime @default(now()) @map("earned_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@map("user_badges")
+}
