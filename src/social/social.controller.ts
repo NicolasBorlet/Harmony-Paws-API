@@ -7,25 +7,53 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { SocialService } from './social.service';
 import { SendFriendRequestDto } from './dto/social.dto';
+import {
+  ApiJwtAuth,
+  ApiStandardResponses,
+} from '../common/swagger/decorators/api-common.decorator';
+import {
+  FriendRequestResponseDto,
+  FriendshipResponseDto,
+  UserMeetingResponseDto,
+} from '../common/swagger/dto/responses/activity-social.response.dto';
 
 @ApiTags('social')
 @Controller('social')
 @UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
+@ApiJwtAuth()
 export class SocialController {
   constructor(private readonly socialService: SocialService) {}
 
   @Get('friend-requests')
+  @ApiOperation({
+    summary: 'Lister les demandes d\'amitié',
+    description: 'Demandes reçues et envoyées pour l\'utilisateur connecté.',
+  })
+  @ApiOkResponse({ type: [FriendRequestResponseDto] })
+  @ApiStandardResponses({ unauthorized: true })
   listFriendRequests(@CurrentUser() user: AuthUser) {
     return this.socialService.listFriendRequests(user.id);
   }
 
   @Post('friend-requests')
+  @ApiOperation({
+    summary: 'Envoyer une demande d\'amitié',
+    description: 'Crée une demande en statut `pending` vers `recipientId`.',
+  })
+  @ApiCreatedResponse({ type: FriendRequestResponseDto })
+  @ApiStandardResponses({ unauthorized: true, conflict: true, notFound: true })
   sendFriendRequest(
     @CurrentUser() user: AuthUser,
     @Body() body: SendFriendRequestDto,
@@ -34,6 +62,10 @@ export class SocialController {
   }
 
   @Post('friend-requests/:id/accept')
+  @ApiOperation({ summary: 'Accepter une demande d\'amitié' })
+  @ApiParam({ name: 'id', description: 'Identifiant de la demande', example: '1' })
+  @ApiOkResponse({ type: FriendshipResponseDto })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   acceptFriendRequest(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
@@ -42,11 +74,22 @@ export class SocialController {
   }
 
   @Get('friends')
+  @ApiOperation({ summary: 'Lister mes amis' })
+  @ApiOkResponse({ type: [FriendshipResponseDto] })
+  @ApiStandardResponses({ unauthorized: true })
   listFriends(@CurrentUser() user: AuthUser) {
     return this.socialService.listFriends(user.id);
   }
 
   @Delete('friends/:friendId')
+  @ApiOperation({ summary: 'Retirer un ami' })
+  @ApiParam({
+    name: 'friendId',
+    description: 'UUID de l\'ami à retirer',
+    example: '550e8400-e29b-41d4-a716-446655440002',
+  })
+  @ApiNoContentResponse({ description: 'Amitié supprimée' })
+  @ApiStandardResponses({ unauthorized: true, notFound: true })
   removeFriend(
     @Param('friendId') friendId: string,
     @CurrentUser() user: AuthUser,
@@ -55,6 +98,12 @@ export class SocialController {
   }
 
   @Get('meetings')
+  @ApiOperation({
+    summary: 'Historique des rencontres',
+    description: 'Utilisateurs rencontrés lors de balades passées.',
+  })
+  @ApiOkResponse({ type: [UserMeetingResponseDto] })
+  @ApiStandardResponses({ unauthorized: true })
   listMeetings(@CurrentUser() user: AuthUser) {
     return this.socialService.listMeetings(user.id);
   }

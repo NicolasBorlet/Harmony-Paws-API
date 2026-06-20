@@ -12,135 +12,207 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Min,
 } from 'class-validator';
 
 export class CreateActivityDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 'Bois de Vincennes',
+    description: 'Lieu ou nom du parcours',
+    maxLength: 50,
+  })
   @IsOptional()
   @IsString()
   place?: string;
 
-  @ApiProperty({ enum: ActivityVisibility })
+  @ApiProperty({
+    enum: ActivityVisibility,
+    example: ActivityVisibility.public,
+    description: 'Visibilité : privée (invitation) ou publique (découverte)',
+  })
   @IsEnum(ActivityVisibility)
   visibility: ActivityVisibility;
 
-  @ApiProperty({ enum: ActivityType })
+  @ApiProperty({
+    enum: ActivityType,
+    example: ActivityType.forest,
+    description: 'Type d\'environnement de la balade',
+  })
   @IsEnum(ActivityType)
   type: ActivityType;
 
-  @ApiProperty()
+  @ApiProperty({
+    example: '2026-06-20T09:00:00.000Z',
+    description: 'Date et heure planifiées de la balade',
+  })
   @IsString()
   date: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: '1h30',
+    description: 'Durée estimée (texte libre)',
+  })
   @IsOptional()
   @IsString()
   duration?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 6,
+    description: 'Nombre maximum de participants',
+    minimum: 1,
+  })
   @IsOptional()
   @IsInt()
+  @Min(1)
   participantLimit?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: '48.832778',
+    description: 'Latitude du point de rendez-vous',
+  })
   @IsOptional()
   @IsString()
   latitude?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: '2.432222',
+    description: 'Longitude du point de rendez-vous',
+  })
   @IsOptional()
   @IsString()
   longitude?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '75', description: 'Code département' })
   @IsOptional()
   @IsString()
   department?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'FR', description: 'Code pays ISO' })
   @IsOptional()
   @IsString()
   country?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 'u09tvw0',
+    description: 'Geohash pour la découverte locale (GET /activities/discover)',
+  })
   @IsOptional()
   @IsString()
   geohash?: string;
 }
 
 export class CreateInvitationDto {
-  @ApiProperty()
+  @ApiProperty({
+    example: '550e8400-e29b-41d4-a716-446655440002',
+    description: 'UUID de l\'utilisateur invité',
+    format: 'uuid',
+  })
   @IsUUID()
   receiverId: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'UUID de l\'activité',
+    format: 'uuid',
+  })
   @IsUUID()
   activityId: string;
 }
 
 export class UpdateActivityStatusDto {
-  @ApiProperty({ enum: ActivityStatus })
+  @ApiProperty({
+    enum: ActivityStatus,
+    example: ActivityStatus.in_progress,
+    description: 'Nouveau statut de la balade',
+  })
   @IsEnum(ActivityStatus)
   status: ActivityStatus;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: '2026-06-20T09:05:00.000Z',
+    description: 'Horodatage réel de démarrage',
+  })
   @IsOptional()
   @IsString()
   startedAt?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: '2026-06-20T10:35:00.000Z',
+    description: 'Horodatage réel de fin',
+  })
   @IsOptional()
   @IsString()
   endedAt?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: {
+      is_active: true,
+      started_by: '550e8400-e29b-41d4-a716-446655440001',
+      participants_ready: ['550e8400-e29b-41d4-a716-446655440002'],
+    },
+    description: 'État temps réel synchronisé entre participants',
+  })
   @IsOptional()
   currentState?: Record<string, unknown>;
 }
 
 export class SaveActivityStatsDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 5.2,
+    description: 'Distance parcourue en kilomètres',
+  })
   @IsOptional()
   @IsNumber()
   distanceKm?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 90,
+    description: 'Durée totale en minutes',
+  })
   @IsOptional()
   @IsInt()
   durationMinutes?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-06-20T09:05:00.000Z' })
   @IsOptional()
   @IsString()
   actualStartTime?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-06-20T10:35:00.000Z' })
   @IsOptional()
   @IsString()
   actualEndTime?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Trace GPS : tableau de points { lat, lng, timestamp }',
+    example: [
+      { lat: 48.832, lng: 2.432, timestamp: '2026-06-20T09:10:00.000Z' },
+    ],
+  })
   @IsOptional()
   routePoints?: unknown;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: true })
   @IsOptional()
   @IsBoolean()
   isCompleted?: boolean;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 8500 })
   @IsOptional()
   @IsInt()
   stepsCount?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 320 })
   @IsOptional()
   @IsInt()
   caloriesBurned?: number;
 }
 
 export class SaveLivePushTokenDto {
-  @ApiProperty()
+  @ApiProperty({
+    example: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
+    description: 'Token push pour recevoir les mises à jour live de la balade',
+  })
   @IsString()
   pushToken: string;
 }
