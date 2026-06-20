@@ -19,6 +19,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
 import { ActivitiesService } from './activities.service';
 import {
   CreateActivityDto,
@@ -111,10 +112,10 @@ export class ActivitiesController {
   @ApiOkResponse({ type: ActivityInvitationResponseDto })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   acceptInvitation(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.activitiesService.acceptInvitation(BigInt(id), user.id);
+    return this.activitiesService.acceptInvitation(id, user.id);
   }
 
   @Get(':id')

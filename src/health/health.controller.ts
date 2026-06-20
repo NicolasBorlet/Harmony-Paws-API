@@ -18,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
 import { HealthService } from './health.service';
 import {
   CreateHealthDocumentDto,
@@ -141,11 +142,11 @@ export class HealthController {
   @ApiOkResponse({ type: HealthReminderResponseDto })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   updateReminder(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: AuthUser,
     @Body() body: UpdateHealthReminderDto,
   ) {
-    return this.healthService.updateReminder(BigInt(id), user.id, body);
+    return this.healthService.updateReminder(id, user.id, body);
   }
 
   @Delete('reminders/:id')
@@ -153,7 +154,10 @@ export class HealthController {
   @ApiParam({ name: 'id', description: 'Identifiant du rappel', example: '1' })
   @ApiNoContentResponse({ description: 'Rappel supprimé' })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
-  deleteReminder(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.healthService.deleteReminder(BigInt(id), user.id);
+  deleteReminder(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.healthService.deleteReminder(id, user.id);
   }
 }

@@ -17,6 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
 import { SocialService } from './social.service';
 import { SendFriendRequestDto } from './dto/social.dto';
 import {
@@ -67,10 +68,37 @@ export class SocialController {
   @ApiOkResponse({ type: FriendshipResponseDto })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   acceptFriendRequest(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.socialService.acceptFriendRequest(BigInt(id), user.id);
+    return this.socialService.acceptFriendRequest(id, user.id);
+  }
+
+  @Post('friend-requests/:id/reject')
+  @ApiOperation({ summary: 'Refuser une demande d\'amitié' })
+  @ApiParam({ name: 'id', description: 'Identifiant de la demande', example: '1' })
+  @ApiNoContentResponse({ description: 'Demande refusée' })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  rejectFriendRequest(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.socialService.rejectFriendRequest(id, user.id);
+  }
+
+  @Delete('friend-requests/:id')
+  @ApiOperation({
+    summary: 'Annuler une demande d\'amitié envoyée',
+    description: 'Réservé à l\'expéditeur de la demande.',
+  })
+  @ApiParam({ name: 'id', description: 'Identifiant de la demande', example: '1' })
+  @ApiNoContentResponse({ description: 'Demande annulée' })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  cancelFriendRequest(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.socialService.cancelFriendRequest(id, user.id);
   }
 
   @Get('friends')

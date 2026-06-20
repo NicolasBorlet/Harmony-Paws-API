@@ -41,6 +41,8 @@ export class NotificationsService {
           body: content.slice(0, 100),
           data: { type: 'message', senderId },
         }),
+        // Avoid piling up open sockets if Expo is slow/unreachable.
+        signal: AbortSignal.timeout(5000),
       });
     } catch (error) {
       this.logger.warn(`Failed to send push notification: ${error}`);

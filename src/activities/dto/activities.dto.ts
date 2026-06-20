@@ -9,9 +9,13 @@ import {
   IsEnum,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
+  Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -23,6 +27,7 @@ export class CreateActivityDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   place?: string;
 
   @ApiProperty({
@@ -46,6 +51,7 @@ export class CreateActivityDto {
     description: 'Date et heure planifiées de la balade',
   })
   @IsString()
+  @MaxLength(40)
   date: string;
 
   @ApiPropertyOptional({
@@ -54,6 +60,7 @@ export class CreateActivityDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   duration?: string;
 
   @ApiPropertyOptional({
@@ -64,6 +71,7 @@ export class CreateActivityDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(1000)
   participantLimit?: number;
 
   @ApiPropertyOptional({
@@ -72,6 +80,7 @@ export class CreateActivityDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   latitude?: string;
 
   @ApiPropertyOptional({
@@ -80,16 +89,19 @@ export class CreateActivityDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   longitude?: string;
 
   @ApiPropertyOptional({ example: '75', description: 'Code département' })
   @IsOptional()
   @IsString()
+  @MaxLength(10)
   department?: string;
 
   @ApiPropertyOptional({ example: 'FR', description: 'Code pays ISO' })
   @IsOptional()
   @IsString()
+  @MaxLength(56)
   country?: string;
 
   @ApiPropertyOptional({
@@ -98,6 +110,7 @@ export class CreateActivityDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(12)
   geohash?: string;
 }
 
@@ -134,6 +147,7 @@ export class UpdateActivityStatusDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(40)
   startedAt?: string;
 
   @ApiPropertyOptional({
@@ -142,6 +156,7 @@ export class UpdateActivityStatusDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(40)
   endedAt?: string;
 
   @ApiPropertyOptional({
@@ -153,6 +168,7 @@ export class UpdateActivityStatusDto {
     description: 'État temps réel synchronisé entre participants',
   })
   @IsOptional()
+  @IsObject()
   currentState?: Record<string, unknown>;
 }
 
@@ -214,5 +230,9 @@ export class SaveLivePushTokenDto {
     description: 'Token push pour recevoir les mises à jour live de la balade',
   })
   @IsString()
+  @MaxLength(255)
+  @Matches(/^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/, {
+    message: 'pushToken must be a valid Expo push token',
+  })
   pushToken: string;
 }

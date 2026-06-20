@@ -1,6 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DocumentType } from '@prisma/client';
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CreateVaccinationDto {
   @ApiProperty({
@@ -9,6 +19,7 @@ export class CreateVaccinationDto {
   })
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
   name: string;
 
   @ApiProperty({
@@ -33,6 +44,8 @@ export class CreateMeasurementDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(300)
   height?: number;
 
   @ApiPropertyOptional({
@@ -41,6 +54,8 @@ export class CreateMeasurementDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(200)
   weight?: number;
 }
 
@@ -51,6 +66,7 @@ export class CreateHealthDocumentDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   fileName?: string;
 
   @ApiProperty({
@@ -66,6 +82,7 @@ export class CreateHealthDocumentDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   place?: string;
 
   @ApiPropertyOptional({
@@ -73,6 +90,7 @@ export class CreateHealthDocumentDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   reason?: string;
 }
 
@@ -83,6 +101,7 @@ export class CreateHealthReminderDto {
   })
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
   title: string;
 
   @ApiProperty({
@@ -97,6 +116,7 @@ export class CreateHealthReminderDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   notes?: string;
 }
 
@@ -105,6 +125,7 @@ export class UpdateHealthReminderDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
   title?: string;
 
   @ApiPropertyOptional({ example: '2026-08-01' })
@@ -115,5 +136,6 @@ export class UpdateHealthReminderDto {
   @ApiPropertyOptional({ example: 'Reporter d\'un mois' })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   notes?: string;
 }

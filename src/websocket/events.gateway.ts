@@ -22,7 +22,7 @@ export const WS_EVENTS = {
 @Injectable()
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',') ?? '*',
+    origin: process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean) ?? false,
     credentials: true,
   },
   namespace: '/events',
@@ -40,9 +40,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(client: Socket) {
     try {
-      const token =
-        (client.handshake.auth?.token as string) ||
-        (client.handshake.query?.token as string);
+      // Only accept the token via the auth payload — never the query string,
+      // which leaks into proxy/server logs and browser history.
+      const token = client.handshake.auth?.token as string | undefined;
       if (!token) {
         client.disconnect();
         return;
@@ -50,6 +50,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const payload = this.jwt.verify<{ sub: string }>(token, {
         secret: this.config.getOrThrow('JWT_SECRET'),
+        algorithms: ['HS256'],
       });
 
       client.data.userId = payload.sub;

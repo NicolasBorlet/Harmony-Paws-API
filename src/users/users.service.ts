@@ -37,19 +37,28 @@ export class UsersService {
   }
 
   async searchUsers(query: string, excludeUserId: string) {
+    const trimmed = query.trim();
+    // Require a minimum length to prevent enumeration / bulk PII scraping by
+    // iterating over short prefixes.
+    if (trimmed.length < 3) {
+      return [];
+    }
+
     const users = await this.prisma.user.findMany({
       where: {
         id: { not: excludeUserId },
         OR: [
-          { email: { contains: query, mode: 'insensitive' } },
-          { firstName: { contains: query, mode: 'insensitive' } },
-          { lastName: { contains: query, mode: 'insensitive' } },
+          // Email is only matched on an exact (case-insensitive) address, never
+          // a substring, so the search cannot be used to harvest the user base.
+          { email: { equals: trimmed, mode: 'insensitive' } },
+          { firstName: { contains: trimmed, mode: 'insensitive' } },
+          { lastName: { contains: trimmed, mode: 'insensitive' } },
         ],
       },
       take: 20,
+      // Email is intentionally excluded from the result to avoid leaking PII.
       select: {
         id: true,
-        email: true,
         firstName: true,
         lastName: true,
         place: true,
