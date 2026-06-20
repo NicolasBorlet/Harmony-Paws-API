@@ -5,6 +5,8 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthTokensDto, LoginDto, RegisterDto } from './dto/auth.dto';
 
+const BCRYPT_ROUNDS = 12;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -21,7 +23,7 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
@@ -53,13 +55,20 @@ export class AuthService {
     try {
       const payload = this.jwt.verify<{ sub: string; email: string }>(
         refreshToken,
-        { secret: this.config.getOrThrow('JWT_REFRESH_SECRET') },
+        {
+          secret: this.config.getOrThrow('JWT_REFRESH_SECRET'),
+          algorithms: ['HS256'],
+        },
       );
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
       });
-      if (!user || user.refreshToken !== refreshToken) {
+      // The stored refresh token is hashed; compare against the presented one.
+      const matches =
+        !!user?.refreshToken &&
+        (await bcrypt.compare(refreshToken, user.refreshToken));
+      if (!user || !matches) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
@@ -84,15 +93,20 @@ export class AuthService {
     const accessToken = this.jwt.sign(payload, {
       secret: this.config.getOrThrow<string>('JWT_SECRET'),
       expiresIn: '15m',
+      algorithm: 'HS256',
     });
     const refreshToken = this.jwt.sign(payload, {
       secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
+      algorithm: 'HS256',
     });
 
+    // Store only a hash of the refresh token so a database leak does not expose
+    // usable long-lived credentials.
+    const refreshTokenHash = await bcrypt.hash(refreshToken, BCRYPT_ROUNDS);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { refreshToken },
+      data: { refreshToken: refreshTokenHash },
     });
 
     return { accessToken, refreshToken };

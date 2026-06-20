@@ -115,7 +115,25 @@ export class MessagesService {
     title: string,
     participantIds: string[],
   ) {
-    const allIds = [...new Set([userId, ...participantIds])];
+    const otherIds = [...new Set(participantIds)].filter((id) => id !== userId);
+
+    // A user may only group people they are actually friends with — this
+    // prevents adding arbitrary users to a conversation (spam / harassment).
+    if (otherIds.length > 0) {
+      const friendships = await this.prisma.friendship.findMany({
+        where: { userId, friendId: { in: otherIds } },
+        select: { friendId: true },
+      });
+      const friendIds = new Set(friendships.map((f) => f.friendId));
+      const notFriends = otherIds.filter((id) => !friendIds.has(id));
+      if (notFriends.length > 0) {
+        throw new ForbiddenException(
+          'All participants must be friends with you',
+        );
+      }
+    }
+
+    const allIds = [...new Set([userId, ...otherIds])];
     const conversation = await this.prisma.conversation.create({
       data: {
         title,

@@ -15,6 +15,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
 import { MessagesService } from './messages.service';
 import {
   CreateGroupConversationDto,
@@ -102,10 +103,10 @@ export class MessagesController {
   @ApiOkResponse({ type: [MessageResponseDto] })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   getMessages(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.messagesService.getMessages(BigInt(id), user.id);
+    return this.messagesService.getMessages(id, user.id);
   }
 
   @Post('conversations/:id/messages')
@@ -114,10 +115,10 @@ export class MessagesController {
   @ApiCreatedResponse({ type: MessageResponseDto })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   sendMessage(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: AuthUser,
     @Body() body: SendMessageDto,
   ) {
-    return this.messagesService.sendMessage(BigInt(id), user.id, body.content);
+    return this.messagesService.sendMessage(id, user.id, body.content);
   }
 }

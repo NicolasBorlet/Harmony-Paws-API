@@ -1,12 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DogDominance, DogSex } from '@prisma/client';
 import {
+  ArrayMaxSize,
   IsArray,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
+  Max,
   Min,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
@@ -18,6 +21,7 @@ export class CreateDogDto {
   })
   @IsString()
   @MinLength(1)
+  @MaxLength(50)
   name: string;
 
   @ApiPropertyOptional({
@@ -26,6 +30,7 @@ export class CreateDogDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   description?: string;
 
   @ApiPropertyOptional({
@@ -51,6 +56,7 @@ export class CreateDogDto {
   })
   @IsInt()
   @Min(0)
+  @Max(60)
   age: number;
 
   @ApiProperty({
@@ -67,6 +73,7 @@ export class CreateDogDto {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(20)
   @IsInt({ each: true })
   behaviorIds?: number[];
 }
@@ -76,11 +83,13 @@ export class UpdateDogDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(50)
   name?: string;
 
   @ApiPropertyOptional({ maxLength: 200 })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   description?: string;
 
   @ApiPropertyOptional({ enum: DogDominance })
@@ -97,6 +106,7 @@ export class UpdateDogDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(60)
   age?: number;
 
   @ApiPropertyOptional({ description: 'Nouvel identifiant de race' })
@@ -110,5 +120,6 @@ export class UpdateDogDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   image?: string;
 }

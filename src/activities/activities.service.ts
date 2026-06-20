@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -91,7 +93,8 @@ export class ActivitiesService {
     status: ActivityStatus,
     extra?: { startedAt?: string; endedAt?: string; currentState?: Prisma.InputJsonValue },
   ) {
-    await this.assertParticipant(activityId, userId);
+    // Only the creator may change the lifecycle status of an activity.
+    await this.assertCreator(activityId, userId);
     const activity = await this.prisma.activity.update({
       where: { id: activityId },
       data: {
@@ -155,6 +158,42 @@ export class ActivitiesService {
     receiverId: string,
     activityId: string,
   ) {
+    if (senderId === receiverId) {
+      throw new BadRequestException('Cannot invite yourself');
+    }
+
+    // The sender must be the creator or an existing participant of the activity.
+    await this.assertParticipant(activityId, senderId);
+
+    const receiver = await this.prisma.user.findUnique({
+      where: { id: receiverId },
+      select: { id: true },
+    });
+    if (!receiver) {
+      throw new NotFoundException('Receiver not found');
+    }
+
+    // Already a participant?
+    const alreadyJoined = await this.prisma.userActivity.findUnique({
+      where: { userId_activityId: { userId: receiverId, activityId } },
+    });
+    if (alreadyJoined) {
+      throw new ConflictException('User already joined this activity');
+    }
+
+    // A pending invitation already exists — stay idempotent.
+    const existing = await this.prisma.activityInvitation.findFirst({
+      where: {
+        activityId,
+        receiverId,
+        status: ActivityInvitationStatus.pending,
+      },
+      include: { activity: true },
+    });
+    if (existing) {
+      return serialize(existing);
+    }
+
     const invitation = await this.prisma.activityInvitation.create({
       data: { senderId, receiverId, activityId },
       include: { activity: true },
@@ -221,10 +260,16 @@ export class ActivitiesService {
   }
 
   async discoverByGeohash(geohashPrefix: string) {
+    // Require a minimum precision to avoid dumping every public activity
+    // worldwide by paginating over short prefixes.
+    const prefix = geohashPrefix.trim();
+    if (prefix.length < 3) {
+      return [];
+    }
     const activities = await this.prisma.activity.findMany({
       where: {
         visibility: 'public',
-        geohash: { startsWith: geohashPrefix },
+        geohash: { startsWith: prefix },
         status: { in: ['not_started', 'ready_to_start'] },
       },
       take: 50,
@@ -242,6 +287,17 @@ export class ActivitiesService {
       activity.creatorId === userId ||
       activity.userActivities.some((ua) => ua.userId === userId);
     if (!isParticipant) throw new ForbiddenException('Not a participant');
+  }
+
+  private async assertCreator(activityId: string, userId: string) {
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { creatorId: true },
+    });
+    if (!activity) throw new NotFoundException('Activity not found');
+    if (activity.creatorId !== userId) {
+      throw new ForbiddenException('Only the creator can perform this action');
+    }
   }
 
   private async syncUserStats(

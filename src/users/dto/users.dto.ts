@@ -1,5 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({
@@ -9,6 +18,7 @@ export class UpdateProfileDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   firstName?: string;
 
   @ApiPropertyOptional({
@@ -18,6 +28,7 @@ export class UpdateProfileDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   lastName?: string;
 
   @ApiPropertyOptional({
@@ -39,6 +50,7 @@ export class UpdateProfileDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   place?: string;
 
   @ApiPropertyOptional({
@@ -48,6 +60,7 @@ export class UpdateProfileDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   description?: string;
 
   @ApiPropertyOptional({
@@ -64,5 +77,9 @@ export class UpdateProfileDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
+  @Matches(/^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/, {
+    message: 'expoPushToken must be a valid Expo push token',
+  })
   expoPushToken?: string;
 }
