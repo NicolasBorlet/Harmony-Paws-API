@@ -82,4 +82,60 @@ export class UpdateProfileDto {
     message: 'expoPushToken must be a valid Expo push token',
   })
   expoPushToken?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Activer les notifications push',
+  })
+  @IsOptional()
+  @IsBoolean()
+  pushNotifications?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Activer les notifications par email',
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailNotifications?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Activer les notifications de balades',
+  })
+  @IsOptional()
+  @IsBoolean()
+  rideNotifications?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Activer les notifications de messages',
+  })
+  @IsOptional()
+  @IsBoolean()
+  messageNotifications?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Rendre le profil visible par les autres utilisateurs',
+  })
+  @IsOptional()
+  @IsBoolean()
+  publicProfile?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Partager la localisation pendant les activités',
+  })
+  @IsOptional()
+  @IsBoolean()
+  shareLocation?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Autoriser la collecte de données analytiques',
+  })
+  @IsOptional()
+  @IsBoolean()
+  analytics?: boolean;
 }

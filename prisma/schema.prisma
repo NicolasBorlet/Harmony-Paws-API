@@ -125,6 +125,7 @@ model User {
   userPurchases           UserPurchase[]
   opinions                Opinion[]
   userStats               UserStats?
+  userPreferences         UserPreferences?
   userStatsHistory        UserStatsHistory[]
   userBadges              UserBadge[]
   formationFavorites      FormationFavorite[]
@@ -622,6 +623,28 @@ model FormationFavorite {
 
   @@unique([userId, formationId])
   @@map("formation_favorites")
+}
+
+// ---------------------------------------------------------------------------
+// User preferences (notifications & privacy)
+// ---------------------------------------------------------------------------
+
+model UserPreferences {
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String   @unique @map("user_id") @db.Uuid
+  pushNotifications    Boolean  @default(true) @map("push_notifications")
+  emailNotifications   Boolean  @default(true) @map("email_notifications")
+  rideNotifications    Boolean  @default(true) @map("ride_notifications")
+  messageNotifications Boolean  @default(true) @map("message_notifications")
+  publicProfile        Boolean  @default(true) @map("public_profile")
+  shareLocation        Boolean  @default(true) @map("share_location")
+  analytics            Boolean  @default(true)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
 
 // ---------------------------------------------------------------------------

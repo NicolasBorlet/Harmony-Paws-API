@@ -20,6 +20,38 @@ export class UserStatsEmbeddedDto {
   longest_streak?: number;
 }
 
+export class UserPreferencesEmbeddedDto {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  id: string;
+
+  @ApiProperty({ example: true })
+  push_notifications: boolean;
+
+  @ApiProperty({ example: true })
+  email_notifications: boolean;
+
+  @ApiProperty({ example: true })
+  ride_notifications: boolean;
+
+  @ApiProperty({ example: true })
+  message_notifications: boolean;
+
+  @ApiProperty({ example: true })
+  public_profile: boolean;
+
+  @ApiProperty({ example: true })
+  share_location: boolean;
+
+  @ApiProperty({ example: true })
+  analytics: boolean;
+
+  @ApiProperty({ example: '2026-01-15T08:00:00.000Z' })
+  created_at: string;
+
+  @ApiProperty({ example: '2026-06-19T10:00:00.000Z' })
+  updated_at: string;
+}
+
 export class UserProfileResponseDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   id: string;
@@ -59,6 +91,9 @@ export class UserProfileResponseDto {
 
   @ApiPropertyOptional({ type: UserStatsEmbeddedDto })
   user_stats?: UserStatsEmbeddedDto | null;
+
+  @ApiPropertyOptional({ type: UserPreferencesEmbeddedDto })
+  user_preferences?: UserPreferencesEmbeddedDto | null;
 }
 
 export class UserPublicProfileResponseDto {

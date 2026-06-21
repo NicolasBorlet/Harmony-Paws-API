@@ -70,6 +70,7 @@ async function main() {
             onBoarding: false,
             roleId: 1,
             userStats: { create: {} },
+            userPreferences: { create: {} },
         },
     });
 }

@@ -29,6 +29,7 @@ export class AuthService {
         email: dto.email,
         passwordHash,
         userStats: { create: {} },
+        userPreferences: { create: {} },
       },
     });
 

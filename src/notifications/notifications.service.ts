@@ -17,11 +17,19 @@ export class NotificationsService {
     content: string,
   ) {
     const [recipient, sender] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: recipientId } }),
+      this.prisma.user.findUnique({
+        where: { id: recipientId },
+        include: { userPreferences: true },
+      }),
       this.prisma.user.findUnique({ where: { id: senderId } }),
     ]);
 
     if (!recipient?.expoPushToken) return;
+
+    const prefs = recipient.userPreferences;
+    if (prefs && (!prefs.pushNotifications || !prefs.messageNotifications)) {
+      return;
+    }
 
     const token = this.config.get('EXPO_ACCESS_TOKEN');
     const title = sender?.firstName

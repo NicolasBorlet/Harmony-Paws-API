@@ -54,7 +54,7 @@ export class UsersController {
   @ApiOperation({
     summary: 'Mettre à jour le profil',
     description:
-      'Mise à jour partielle — seuls les champs fournis sont modifiés.',
+      'Mise à jour partielle — profil, token push et préférences (notifications, confidentialité). Seuls les champs fournis sont modifiés.',
   })
   @ApiOkResponse({
     description: 'Profil mis à jour',

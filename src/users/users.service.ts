@@ -1,6 +1,31 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { serialize } from '../common/utils/serialize';
+import { UpdateProfileDto } from './dto/users.dto';
+
+const PREFERENCE_FIELDS = [
+  'pushNotifications',
+  'emailNotifications',
+  'rideNotifications',
+  'messageNotifications',
+  'publicProfile',
+  'shareLocation',
+  'analytics',
+] as const;
+
+type PreferenceField = (typeof PREFERENCE_FIELDS)[number];
+type PreferenceUpdate = Partial<Record<PreferenceField, boolean>>;
+
+const DEFAULT_PREFERENCES: Record<PreferenceField, boolean> = {
+  pushNotifications: true,
+  emailNotifications: true,
+  rideNotifications: true,
+  messageNotifications: true,
+  publicProfile: true,
+  shareLocation: true,
+  analytics: true,
+};
 
 @Injectable()
 export class UsersService {
@@ -17,10 +42,42 @@ export class UsersService {
     updatedAt: true,
   } as const;
 
+  private readonly meInclude = {
+    userStats: true,
+    userPreferences: true,
+  } as const;
+
+  private extractPreferenceUpdates(data: UpdateProfileDto): PreferenceUpdate {
+    const updates: PreferenceUpdate = {};
+    for (const field of PREFERENCE_FIELDS) {
+      if (data[field] !== undefined) {
+        updates[field] = data[field];
+      }
+    }
+    return updates;
+  }
+
+  private extractProfileData(
+    data: UpdateProfileDto,
+  ): Prisma.UserUpdateInput {
+    const {
+      pushNotifications: _pushNotifications,
+      emailNotifications: _emailNotifications,
+      rideNotifications: _rideNotifications,
+      messageNotifications: _messageNotifications,
+      publicProfile: _publicProfile,
+      shareLocation: _shareLocation,
+      analytics: _analytics,
+      ...profileData
+    } = data;
+
+    return profileData;
+  }
+
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { userStats: true },
+      include: this.meInclude,
     });
     if (!user) throw new NotFoundException('User not found');
     const { passwordHash, refreshToken, ...rest } = user;
@@ -36,21 +93,28 @@ export class UsersService {
     return serialize(user);
   }
 
-  async updateProfile(
-    userId: string,
-    data: {
-      firstName?: string;
-      lastName?: string;
-      age?: number;
-      place?: string;
-      description?: string;
-      onBoarding?: boolean;
-      expoPushToken?: string;
-    },
-  ) {
+  async updateProfile(userId: string, data: UpdateProfileDto) {
+    const profileData = this.extractProfileData(data);
+    const preferenceUpdates = this.extractPreferenceUpdates(data);
+    const hasPreferenceUpdates = Object.keys(preferenceUpdates).length > 0;
+
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data,
+      data: {
+        ...profileData,
+        ...(hasPreferenceUpdates && {
+          userPreferences: {
+            upsert: {
+              create: {
+                ...DEFAULT_PREFERENCES,
+                ...preferenceUpdates,
+              },
+              update: preferenceUpdates,
+            },
+          },
+        }),
+      },
+      include: this.meInclude,
     });
     const { passwordHash, refreshToken, ...rest } = user;
     return serialize(rest);
