@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   RevenueCatEntitlement,
   RevenueCatSubscriberResponse,
+  RevenueCatWebhookEvent,
   RevenueCatWebhookPayload,
 } from './revenuecat.types';
 
@@ -52,9 +53,37 @@ export class RevenueCatService {
     }
   }
 
+  private shouldGrantPremium(event: RevenueCatWebhookEvent): boolean {
+    const premiumEntitlementId = this.getPremiumEntitlementId();
+    const ids = event.entitlement_ids;
+
+    if (!ids?.length) {
+      this.logger.warn(
+        `Webhook ${event.type}: entitlement_ids is empty — granting premium (map your product to entitlement "${premiumEntitlementId}" in RevenueCat)`,
+      );
+      return true;
+    }
+
+    if (ids.includes(premiumEntitlementId)) {
+      return true;
+    }
+
+    this.logger.warn(
+      `Webhook ${event.type}: entitlement_ids=[${ids.join(', ')}] does not include "${premiumEntitlementId}" — granting premium (update REVENUECAT_PREMIUM_ENTITLEMENT_ID if needed)`,
+    );
+    return true;
+  }
+
+  private shouldRevokePremium(event: RevenueCatWebhookEvent): boolean {
+    const premiumEntitlementId = this.getPremiumEntitlementId();
+    const ids = event.entitlement_ids;
+
+    if (!ids?.length) return true;
+    return ids.includes(premiumEntitlementId);
+  }
+
   async handleWebhook(payload: RevenueCatWebhookPayload): Promise<void> {
     const { event } = payload;
-    const premiumEntitlementId = this.getPremiumEntitlementId();
 
     if (event.type === 'TEST') {
       this.logger.log('Received RevenueCat TEST webhook');
@@ -70,10 +99,8 @@ export class RevenueCatService {
     }
 
     const customerId = event.original_app_user_id ?? event.app_user_id;
-    const hasPremiumEntitlement =
-      event.entitlement_ids?.includes(premiumEntitlementId) ?? false;
 
-    if (PREMIUM_GRANT_EVENTS.has(event.type) && hasPremiumEntitlement) {
+    if (PREMIUM_GRANT_EVENTS.has(event.type) && this.shouldGrantPremium(event)) {
       await this.setPremium(userId, customerId, true);
       this.logger.log(
         `Premium granted for user ${userId} (${event.type})`,
@@ -81,7 +108,7 @@ export class RevenueCatService {
       return;
     }
 
-    if (PREMIUM_REVOKE_EVENTS.has(event.type) && hasPremiumEntitlement) {
+    if (PREMIUM_REVOKE_EVENTS.has(event.type) && this.shouldRevokePremium(event)) {
       await this.setPremium(userId, customerId, false);
       this.logger.log(
         `Premium revoked for user ${userId} (${event.type})`,
@@ -102,14 +129,18 @@ export class RevenueCatService {
       );
     }
 
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    };
+
+    if (this.config.get<string>('NODE_ENV') !== 'production') {
+      headers['X-Is-Sandbox'] = 'true';
+    }
+
     const response = await fetch(
       `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: 'application/json',
-        },
-      },
+      { headers },
     );
 
     if (!response.ok) {
@@ -123,10 +154,11 @@ export class RevenueCatService {
 
     const data = (await response.json()) as RevenueCatSubscriberResponse;
     const premiumEntitlementId = this.getPremiumEntitlementId();
-    const isPremium = this.isEntitlementActive(
-      data.subscriber.entitlements[premiumEntitlementId],
-      data.request_date_ms,
-    );
+    const configuredEntitlement =
+      data.subscriber.entitlements[premiumEntitlementId];
+    const isPremium =
+      this.isEntitlementActive(configuredEntitlement, data.request_date_ms) ||
+      this.hasAnyActiveEntitlement(data);
     const customerId = data.subscriber.original_app_user_id ?? userId;
 
     await this.setPremium(userId, customerId, isPremium);
@@ -155,6 +187,14 @@ export class RevenueCatService {
     }
 
     return false;
+  }
+
+  private hasAnyActiveEntitlement(
+    data: RevenueCatSubscriberResponse,
+  ): boolean {
+    return Object.values(data.subscriber.entitlements).some((entitlement) =>
+      this.isEntitlementActive(entitlement, data.request_date_ms),
+    );
   }
 
   private async resolveUserId(
