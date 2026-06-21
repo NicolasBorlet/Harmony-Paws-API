@@ -13,6 +13,7 @@ import { FormationsModule } from './formations/formations.module';
 import { StatsBadgesModule } from './stats-badges/stats-badges.module';
 import { StorageModule } from './storage/storage.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { BillingModule } from './billing/billing.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SystemModule } from './system/system.module';
@@ -40,6 +41,7 @@ import { SystemModule } from './system/system.module';
     StatsBadgesModule,
     StorageModule,
     NotificationsModule,
+    BillingModule,
   ],
   providers: [
     {

@@ -80,6 +80,15 @@ export class UserProfileResponseDto {
   @ApiProperty({ example: false })
   on_boarding: boolean;
 
+  @ApiProperty({ example: false, description: 'Abonnement premium actif' })
+  is_premium: boolean;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Identifiant RevenueCat (app_user_id)',
+  })
+  customer_id?: string | null;
+
   @ApiPropertyOptional({ example: 'ExponentPushToken[xxx]' })
   expo_push_token?: string | null;
 

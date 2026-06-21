@@ -102,6 +102,8 @@ model User {
   description   String?  @db.VarChar(500)
   onBoarding    Boolean  @default(true) @map("on_boarding")
   expoPushToken String?  @map("expo_push_token")
+  isPremium     Boolean  @default(false) @map("is_premium")
+  customerId    String?  @map("customer_id")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
