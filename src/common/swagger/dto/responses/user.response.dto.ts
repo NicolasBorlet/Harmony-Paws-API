@@ -61,6 +61,32 @@ export class UserProfileResponseDto {
   user_stats?: UserStatsEmbeddedDto | null;
 }
 
+export class UserPublicProfileResponseDto {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  id: string;
+
+  @ApiPropertyOptional({ example: 'Marie' })
+  first_name?: string | null;
+
+  @ApiPropertyOptional({ example: 'Dupont' })
+  last_name?: string | null;
+
+  @ApiPropertyOptional({ example: 28 })
+  age?: number | null;
+
+  @ApiPropertyOptional({ example: 'Paris' })
+  place?: string | null;
+
+  @ApiPropertyOptional({ example: 'Passionnée de randonnée avec mon labrador.' })
+  description?: string | null;
+
+  @ApiProperty({ example: '2026-01-15T08:00:00.000Z' })
+  created_at: string;
+
+  @ApiProperty({ example: '2026-06-19T10:00:00.000Z' })
+  updated_at: string;
+}
+
 export class UserSearchResultDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   id: string;

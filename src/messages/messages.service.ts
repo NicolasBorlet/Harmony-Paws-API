@@ -173,6 +173,9 @@ export class MessagesService {
       where: { conversationId },
     });
 
+    const participantUserIds = participants.map((p) => p.userId);
+
+    this.events.emitToUsers(participantUserIds, WS_EVENTS.MESSAGE_NEW, message);
     this.events.emitToConversation(
       conversationId.toString(),
       WS_EVENTS.MESSAGE_NEW,

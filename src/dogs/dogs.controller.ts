@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,7 +20,7 @@ import {
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { DogsService } from './dogs.service';
-import { CreateDogDto, UpdateDogDto } from './dto/dogs.dto';
+import { CreateDogDto, DiscoverDogsQueryDto, UpdateDogDto } from './dto/dogs.dto';
 import {
   ApiJwtAuth,
   ApiStandardResponses,
@@ -28,6 +29,7 @@ import { HasDogResponseDto } from '../common/swagger/dto/responses/common.respon
 import {
   BehaviorResponseDto,
   BreedResponseDto,
+  DiscoverDogsResponseDto,
   DogResponseDto,
 } from '../common/swagger/dto/responses/dog.response.dto';
 
@@ -47,6 +49,21 @@ export class DogsController {
   @ApiStandardResponses({ unauthorized: true })
   list(@CurrentUser() user: AuthUser) {
     return this.dogsService.listByOwner(user.id);
+  }
+
+  @Get('discover')
+  @ApiOperation({
+    summary: 'Découvrir des chiens',
+    description:
+      'Liste paginée de tous les chiens (hors les vôtres), avec filtres optionnels.',
+  })
+  @ApiOkResponse({ type: DiscoverDogsResponseDto })
+  @ApiStandardResponses({ unauthorized: true })
+  discover(
+    @CurrentUser() user: AuthUser,
+    @Query() query: DiscoverDogsQueryDto,
+  ) {
+    return this.dogsService.discover(user.id, query);
   }
 
   @Get('has-dog')

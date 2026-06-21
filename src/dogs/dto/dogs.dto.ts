@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DogDominance, DogSex } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -12,6 +13,50 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+
+export class DiscoverDogsQueryDto {
+  @ApiPropertyOptional({
+    default: 0,
+    minimum: 0,
+    description: 'Index de page (0-based)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  page?: number = 0;
+
+  @ApiPropertyOptional({
+    default: 5,
+    minimum: 1,
+    maximum: 50,
+    description: 'Nombre de chiens par page',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  pageSize?: number = 5;
+
+  @ApiPropertyOptional({ enum: DogSex })
+  @IsOptional()
+  @IsEnum(DogSex)
+  sex?: DogSex;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 60 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(60)
+  age?: number;
+
+  @ApiPropertyOptional({ enum: DogDominance })
+  @IsOptional()
+  @IsEnum(DogDominance)
+  dominance?: DogDominance;
+}
 
 export class CreateDogDto {
   @ApiProperty({

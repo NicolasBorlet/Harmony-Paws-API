@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { serialize } from '../common/utils/serialize';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -75,7 +76,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitToUser(userId: string, event: string, payload: unknown) {
-    this.server.to(`user:${userId}`).emit(event, payload);
+    this.server.to(`user:${userId}`).emit(event, serialize(payload));
   }
 
   emitToUsers(userIds: string[], event: string, payload: unknown) {
@@ -85,11 +86,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitToConversation(conversationId: string, event: string, payload: unknown) {
-    this.server.to(`conversation:${conversationId}`).emit(event, payload);
+    this.server
+      .to(`conversation:${conversationId}`)
+      .emit(event, serialize(payload));
   }
 
   emitToActivity(activityId: string, event: string, payload: unknown) {
-    this.server.to(`activity:${activityId}`).emit(event, payload);
+    this.server.to(`activity:${activityId}`).emit(event, serialize(payload));
   }
 
   joinConversation(clientId: string, conversationId: string) {

@@ -3,27 +3,64 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DogDominance, DogSex } from '@prisma/client';
+import { DogDominance, DogSex, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { serialize } from '../common/utils/serialize';
+import { DiscoverDogsQueryDto } from './dto/dogs.dto';
 
 @Injectable()
 export class DogsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly dogInclude = {
+    breed: true,
+    dogBehaviors: { include: { behavior: true } },
+  } as const;
+
   async listByOwner(ownerId: string) {
     const dogs = await this.prisma.dog.findMany({
       where: { ownerId },
-      include: { breed: true, dogBehaviors: { include: { behavior: true } } },
+      include: this.dogInclude,
       orderBy: { createdAt: 'desc' },
     });
     return serialize(dogs);
   }
 
+  async discover(userId: string, query: DiscoverDogsQueryDto) {
+    const page = query.page ?? 0;
+    const pageSize = query.pageSize ?? 5;
+
+    const where: Prisma.DogWhereInput = {
+      ownerId: { not: userId },
+      ...(query.sex ? { sex: query.sex } : {}),
+      ...(query.age != null ? { age: query.age } : {}),
+      ...(query.dominance ? { dominance: query.dominance } : {}),
+    };
+
+    const skip = page * pageSize;
+
+    const [dogs, totalCount] = await Promise.all([
+      this.prisma.dog.findMany({
+        where,
+        include: this.dogInclude,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.dog.count({ where }),
+    ]);
+
+    return serialize({
+      dogs,
+      totalCount,
+      hasMore: skip + dogs.length < totalCount,
+    });
+  }
+
   async getById(dogId: string, userId: string) {
     const dog = await this.prisma.dog.findUnique({
       where: { id: dogId },
-      include: { breed: true, dogBehaviors: { include: { behavior: true } } },
+      include: this.dogInclude,
     });
     if (!dog) throw new NotFoundException('Dog not found');
     if (dog.ownerId !== userId) {
@@ -59,7 +96,7 @@ export class DogsService {
             }
           : undefined,
       },
-      include: { breed: true, dogBehaviors: { include: { behavior: true } } },
+      include: this.dogInclude,
     });
     return serialize(dog);
   }

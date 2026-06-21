@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -14,10 +15,13 @@ import {
   ApiJwtAuth,
   ApiStandardResponses,
 } from '../common/swagger/decorators/api-common.decorator';
+import { DogResponseDto } from '../common/swagger/dto/responses/dog.response.dto';
 import {
   UserProfileResponseDto,
+  UserPublicProfileResponseDto,
   UserSearchResultDto,
 } from '../common/swagger/dto/responses/user.response.dto';
+import { DogsService } from '../dogs/dogs.service';
 import { UpdateProfileDto } from './dto/users.dto';
 import { UsersService } from './users.service';
 
@@ -26,7 +30,10 @@ import { UsersService } from './users.service';
 @UseGuards(JwtAuthGuard)
 @ApiJwtAuth()
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly dogsService: DogsService,
+  ) {}
 
   @Get('me')
   @ApiOperation({
@@ -77,5 +84,42 @@ export class UsersController {
   @ApiStandardResponses({ unauthorized: true })
   search(@CurrentUser() user: AuthUser, @Query('q') query: string) {
     return this.usersService.searchUsers(query ?? '', user.id);
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: "Profil public d'un utilisateur",
+    description:
+      'Retourne les informations visibles par les autres utilisateurs (sans email ni données sensibles).',
+  })
+  @ApiParam({
+    name: 'id',
+    description: "UUID de l'utilisateur",
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiOkResponse({
+    description: 'Profil public',
+    type: UserPublicProfileResponseDto,
+  })
+  @ApiStandardResponses({ unauthorized: true, notFound: true })
+  getPublicProfile(@Param('id') id: string) {
+    return this.usersService.getPublicProfile(id);
+  }
+
+  @Get(':id/dogs')
+  @ApiOperation({
+    summary: "Chiens d'un utilisateur",
+    description:
+      'Liste les chiens appartenant à un utilisateur (profil public).',
+  })
+  @ApiParam({
+    name: 'id',
+    description: "UUID du propriétaire",
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiOkResponse({ type: [DogResponseDto] })
+  @ApiStandardResponses({ unauthorized: true, notFound: true })
+  getUserDogs(@Param('id') id: string) {
+    return this.dogsService.listByOwner(id);
   }
 }

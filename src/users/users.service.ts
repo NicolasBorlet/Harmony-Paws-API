@@ -6,6 +6,17 @@ import { serialize } from '../common/utils/serialize';
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly publicProfileSelect = {
+    id: true,
+    firstName: true,
+    lastName: true,
+    age: true,
+    place: true,
+    description: true,
+    createdAt: true,
+    updatedAt: true,
+  } as const;
+
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -14,6 +25,15 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
     const { passwordHash, refreshToken, ...rest } = user;
     return serialize(rest);
+  }
+
+  async getPublicProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: this.publicProfileSelect,
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return serialize(user);
   }
 
   async updateProfile(

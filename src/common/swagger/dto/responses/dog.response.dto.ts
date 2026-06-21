@@ -68,3 +68,14 @@ export class DogResponseDto {
   @ApiPropertyOptional({ type: [DogBehaviorLinkDto] })
   dog_behaviors?: DogBehaviorLinkDto[];
 }
+
+export class DiscoverDogsResponseDto {
+  @ApiProperty({ type: [DogResponseDto] })
+  dogs: DogResponseDto[];
+
+  @ApiProperty({ example: 42 })
+  total_count: number;
+
+  @ApiProperty({ example: true })
+  has_more: boolean;
+}
