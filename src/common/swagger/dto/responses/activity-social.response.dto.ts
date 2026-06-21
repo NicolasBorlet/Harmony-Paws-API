@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ActivityInvitationStatus,
   ActivityStatus,
+  ActivityStyle,
   ActivityType,
   ActivityVisibility,
   FriendRequestStatus,
@@ -22,6 +23,9 @@ export class ActivityResponseDto {
 
   @ApiProperty({ enum: ActivityType, example: ActivityType.forest })
   type: ActivityType;
+
+  @ApiProperty({ enum: ActivityStyle, example: ActivityStyle.casual })
+  style: ActivityStyle;
 
   @ApiProperty({ example: '2026-06-20T09:00:00.000Z' })
   date: string;

@@ -8,6 +8,7 @@ import {
 import {
   ActivityInvitationStatus,
   ActivityStatus,
+  ActivityStyle,
   ActivityType,
   ActivityVisibility,
   Prisma,
@@ -33,7 +34,7 @@ export class ActivitiesService {
       },
       include: {
         userActivities: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
-        steps: true,
+        steps: { orderBy: { sortOrder: 'asc' } },
       },
       orderBy: { date: 'desc' },
     });
@@ -44,8 +45,17 @@ export class ActivitiesService {
     const activity = await this.prisma.activity.findUnique({
       where: { id: activityId },
       include: {
+        creator: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            age: true,
+            place: true,
+          },
+        },
         userActivities: { include: { user: true } },
-        steps: true,
+        steps: { orderBy: { sortOrder: 'asc' } },
         stats: true,
       },
     });
@@ -65,6 +75,7 @@ export class ActivitiesService {
       place?: string;
       visibility: ActivityVisibility;
       type: ActivityType;
+      style?: ActivityStyle;
       date: string;
       duration?: string;
       participantLimit?: number;
@@ -73,18 +84,116 @@ export class ActivitiesService {
       department?: string;
       country?: string;
       geohash?: string;
+      steps?: {
+        place: string;
+        latitude?: number;
+        longitude?: number;
+        estimatedHour: string;
+        sortOrder: number;
+      }[];
     },
   ) {
-    const activity = await this.prisma.activity.create({
-      data: {
-        ...data,
-        date: new Date(data.date),
-        creatorId,
-        userActivities: { create: { userId: creatorId } },
-      },
+    const { steps, ...activityData } = data;
+
+    const activity = await this.prisma.$transaction(async (tx) => {
+      return tx.activity.create({
+        data: {
+          ...activityData,
+          style: activityData.style ?? 'casual',
+          date: new Date(activityData.date),
+          creatorId,
+          userActivities: { create: { userId: creatorId } },
+          ...(steps?.length
+            ? {
+                steps: {
+                  create: steps.map((step) => ({
+                    place: step.place,
+                    latitude: step.latitude,
+                    longitude: step.longitude,
+                    estimatedHour: new Date(step.estimatedHour),
+                    sortOrder: step.sortOrder,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: { steps: { orderBy: { sortOrder: 'asc' } } },
+      });
     });
+
     this.events.emitToUser(creatorId, WS_EVENTS.ACTIVITY_BANNER, activity);
     return serialize(activity);
+  }
+
+  async update(
+    activityId: string,
+    userId: string,
+    data: {
+      place?: string;
+      visibility?: ActivityVisibility;
+      type?: ActivityType;
+      style?: ActivityStyle;
+      date?: string;
+      duration?: string;
+      participantLimit?: number;
+      latitude?: string;
+      longitude?: string;
+      department?: string;
+      country?: string;
+      geohash?: string;
+      steps?: {
+        place: string;
+        latitude?: number;
+        longitude?: number;
+        estimatedHour: string;
+        sortOrder: number;
+      }[];
+    },
+  ) {
+    await this.assertCreator(activityId, userId);
+    const { steps, ...activityData } = data;
+
+    const activity = await this.prisma.$transaction(async (tx) => {
+      if (steps !== undefined) {
+        await tx.step.deleteMany({ where: { activityId } });
+      }
+
+      return tx.activity.update({
+        where: { id: activityId },
+        data: {
+          ...activityData,
+          ...(activityData.date ? { date: new Date(activityData.date) } : {}),
+          ...(steps?.length
+            ? {
+                steps: {
+                  create: steps.map((step) => ({
+                    place: step.place,
+                    latitude: step.latitude,
+                    longitude: step.longitude,
+                    estimatedHour: new Date(step.estimatedHour),
+                    sortOrder: step.sortOrder,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: {
+          steps: { orderBy: { sortOrder: 'asc' } },
+          userActivities: true,
+        },
+      });
+    });
+
+    for (const ua of activity.userActivities) {
+      this.events.emitToUser(ua.userId, WS_EVENTS.ACTIVITY_BANNER, activity);
+    }
+    return serialize(activity);
+  }
+
+  async delete(activityId: string, userId: string) {
+    await this.assertCreator(activityId, userId);
+    await this.prisma.activity.delete({ where: { id: activityId } });
+    return { success: true };
   }
 
   async updateStatus(

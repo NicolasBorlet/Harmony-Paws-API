@@ -30,6 +30,11 @@ enum ActivityVisibility {
   public
 }
 
+enum ActivityStyle {
+  casual
+  hike
+}
+
 enum ActivityInvitationStatus {
   pending
   accepted
@@ -225,6 +230,7 @@ model Activity {
   place            String?            @db.VarChar(50)
   visibility       ActivityVisibility
   type             ActivityType
+  style            ActivityStyle      @default(casual)
   date             DateTime
   duration         String?            @db.VarChar(50)
   status           ActivityStatus     @default(not_started)
@@ -281,15 +287,19 @@ model UserActivity {
 }
 
 model Step {
-  id         BigInt   @id @default(autoincrement())
-  activityId String   @map("activity_id") @db.Uuid
-  latitude   Float
-  longitude  Float
-  timestamp  DateTime
-  createdAt  DateTime @default(now()) @map("created_at")
+  id            BigInt    @id @default(autoincrement())
+  activityId    String    @map("activity_id") @db.Uuid
+  place         String?   @db.VarChar(100)
+  latitude      Float?
+  longitude     Float?
+  estimatedHour DateTime? @map("estimated_hour")
+  sortOrder     Int       @default(0) @map("sort_order")
+  timestamp     DateTime?
+  createdAt     DateTime  @default(now()) @map("created_at")
 
   activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
 
+  @@index([activityId, sortOrder])
   @@map("steps")
 }
 

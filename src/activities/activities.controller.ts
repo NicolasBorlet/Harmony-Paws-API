@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -26,6 +29,7 @@ import {
   CreateInvitationDto,
   SaveActivityStatsDto,
   SaveLivePushTokenDto,
+  UpdateActivityDto,
   UpdateActivityStatusDto,
 } from './dto/activities.dto';
 import {
@@ -211,5 +215,33 @@ export class ActivitiesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.activitiesService.clearLivePushToken(id, user.id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Mettre à jour une balade',
+    description: 'Seul le créateur peut modifier les informations de la balade.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID de l\'activité' })
+  @ApiOkResponse({ type: ActivityResponseDto })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  update(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: UpdateActivityDto,
+  ) {
+    return this.activitiesService.update(id, user.id, body);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Supprimer une balade',
+    description: 'Seul le créateur peut supprimer la balade.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID de l\'activité' })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.activitiesService.delete(id, user.id);
   }
 }
