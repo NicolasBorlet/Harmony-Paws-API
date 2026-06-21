@@ -54,10 +54,12 @@ export class StorageService {
     private readonly prisma: PrismaService,
   ) {
     const endpoint = this.config.getOrThrow('MINIO_ENDPOINT');
+    // Presigned URLs must target an address reachable by mobile clients, not the
+    // internal Docker hostname (e.g. minio:9000). Signing is local — no S3 RPC.
     this.publicEndpoint =
       this.config.get('MINIO_PUBLIC_ENDPOINT') ?? endpoint;
     this.client = new S3Client({
-      endpoint,
+      endpoint: this.publicEndpoint,
       region: this.config.get('MINIO_REGION', 'us-east-1'),
       credentials: {
         accessKeyId: this.config.getOrThrow('MINIO_ACCESS_KEY'),

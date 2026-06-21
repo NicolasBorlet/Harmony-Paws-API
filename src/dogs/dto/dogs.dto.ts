@@ -167,4 +167,15 @@ export class UpdateDogDto {
   @IsString()
   @MaxLength(255)
   image?: string;
+
+  @ApiPropertyOptional({
+    type: [Number],
+    example: [1, 3],
+    description: 'Identifiants des comportements (GET /dogs/behaviors)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsInt({ each: true })
+  behaviorIds?: number[];
 }

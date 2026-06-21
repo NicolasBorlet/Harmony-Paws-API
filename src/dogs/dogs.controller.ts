@@ -91,7 +91,7 @@ export class DogsController {
   @Get('behaviors')
   @ApiOperation({
     summary: 'Catalogue des comportements',
-    description: 'Liste de référence pour le champ `behaviorIds` à la création d\'un chien.',
+    description: 'Liste de référence pour le champ `behaviorIds` à la création ou mise à jour d\'un chien.',
   })
   @ApiOkResponse({ type: [BehaviorResponseDto] })
   @ApiStandardResponses({ unauthorized: true })

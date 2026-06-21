@@ -112,14 +112,29 @@ export class DogsService {
       age: number;
       breedId: number;
       image: string;
+      behaviorIds: number[];
     }>,
   ) {
     await this.getById(dogId, userId);
-    const dog = await this.prisma.dog.update({
-      where: { id: dogId },
-      data,
-      include: { breed: true },
+    const { behaviorIds, ...dogData } = data;
+
+    const dog = await this.prisma.$transaction(async (tx) => {
+      if (behaviorIds !== undefined) {
+        await tx.dogBehavior.deleteMany({ where: { dogId } });
+        if (behaviorIds.length > 0) {
+          await tx.dogBehavior.createMany({
+            data: behaviorIds.map((behaviorId) => ({ dogId, behaviorId })),
+          });
+        }
+      }
+
+      return tx.dog.update({
+        where: { id: dogId },
+        data: dogData,
+        include: this.dogInclude,
+      });
     });
+
     return serialize(dog);
   }
 
