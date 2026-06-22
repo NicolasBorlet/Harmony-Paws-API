@@ -102,8 +102,8 @@ export class UsersController {
     type: UserPublicProfileResponseDto,
   })
   @ApiStandardResponses({ unauthorized: true, notFound: true })
-  getPublicProfile(@Param('id') id: string) {
-    return this.usersService.getPublicProfile(id);
+  getPublicProfile(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.usersService.getPublicProfile(id, user.id);
   }
 
   @Get(':id/dogs')
@@ -119,7 +119,9 @@ export class UsersController {
   })
   @ApiOkResponse({ type: [DogResponseDto] })
   @ApiStandardResponses({ unauthorized: true, notFound: true })
-  getUserDogs(@Param('id') id: string) {
+  async getUserDogs(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    // Respect the owner's privacy preference before exposing their dogs.
+    await this.usersService.assertProfileVisible(id, user.id);
     return this.dogsService.listByOwner(id);
   }
 }

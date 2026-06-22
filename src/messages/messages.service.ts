@@ -26,7 +26,8 @@ export class MessagesService {
             participants: {
               include: {
                 user: {
-                  select: { id: true, firstName: true, lastName: true, email: true },
+                  // Email is PII and is never exposed to other participants.
+                  select: { id: true, firstName: true, lastName: true },
                 },
               },
             },
