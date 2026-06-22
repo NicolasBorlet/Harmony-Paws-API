@@ -53,6 +53,10 @@ export const SWAGGER_TAGS = [
     description: 'Balades, invitations, statuts live et statistiques GPS',
   },
   {
+    name: 'rides',
+    description: 'Templates de balades (admin) — pré-remplissage pour création d\'activité',
+  },
+  {
     name: 'social',
     description: 'Amis, demandes d\'amitié et rencontres',
   },

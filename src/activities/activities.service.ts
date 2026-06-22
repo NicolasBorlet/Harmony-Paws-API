@@ -84,6 +84,7 @@ export class ActivitiesService {
       department?: string;
       country?: string;
       geohash?: string;
+      sourceRideId?: string;
       steps?: {
         place: string;
         latitude?: number;
@@ -93,7 +94,17 @@ export class ActivitiesService {
       }[];
     },
   ) {
-    const { steps, ...activityData } = data;
+    const { steps, sourceRideId, ...activityData } = data;
+
+    if (sourceRideId) {
+      const ride = await this.prisma.ride.findUnique({
+        where: { id: sourceRideId },
+        select: { id: true },
+      });
+      if (!ride) {
+        throw new NotFoundException('Source ride not found');
+      }
+    }
 
     const activity = await this.prisma.$transaction(async (tx) => {
       return tx.activity.create({
@@ -102,6 +113,7 @@ export class ActivitiesService {
           style: activityData.style ?? 'casual',
           date: new Date(activityData.date),
           creatorId,
+          sourceRideId,
           userActivities: { create: { userId: creatorId } },
           ...(steps?.length
             ? {

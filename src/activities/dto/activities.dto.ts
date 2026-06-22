@@ -161,6 +161,15 @@ export class CreateActivityDto {
   geohash?: string;
 
   @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440099',
+    description: 'UUID de la ride template clonée (traçabilité)',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  sourceRideId?: string;
+
+  @ApiPropertyOptional({
     type: [CreateActivityStepDto],
     description: 'Étapes du parcours (requis pour style hike)',
   })

@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { DogsModule } from './dogs/dogs.module';
 import { ActivitiesModule } from './activities/activities.module';
+import { RidesModule } from './rides/rides.module';
 import { SocialModule } from './social/social.module';
 import { MessagesModule } from './messages/messages.module';
 import { HealthModule } from './health/health.module';
@@ -34,6 +35,7 @@ import { SystemModule } from './system/system.module';
     UsersModule,
     DogsModule,
     ActivitiesModule,
+    RidesModule,
     SocialModule,
     MessagesModule,
     HealthModule,

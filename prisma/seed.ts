@@ -4,10 +4,16 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.role.upsert({
+  const userRole = await prisma.role.upsert({
     where: { name: 'user' },
     update: {},
     create: { name: 'user' },
+  });
+
+  const adminRole = await prisma.role.upsert({
+    where: { name: 'admin' },
+    update: {},
+    create: { name: 'admin' },
   });
 
   const breeds = ['Labrador', 'Golden Retriever', 'Berger Allemand', 'Bulldog', 'Caniche'];
@@ -38,7 +44,22 @@ async function main() {
       firstName: 'Demo',
       lastName: 'User',
       onBoarding: false,
-      roleId: 1,
+      roleId: userRole.id,
+      userStats: { create: {} },
+      userPreferences: { create: {} },
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'admin@harmonypaws.app' },
+    update: {},
+    create: {
+      email: 'admin@harmonypaws.app',
+      passwordHash,
+      firstName: 'Admin',
+      lastName: 'User',
+      onBoarding: false,
+      roleId: adminRole.id,
       userStats: { create: {} },
       userPreferences: { create: {} },
     },

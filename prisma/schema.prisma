@@ -111,6 +111,7 @@ model User {
   customer                Customer?
   dogs                    Dog[]
   createdActivities       Activity[]               @relation("ActivityCreator")
+  createdRides            Ride[]                   @relation("RideCreator")
   userActivities          UserActivity[]
   activityStats           ActivityStats[]
   sentInvitations         ActivityInvitation[]     @relation("InvitationSender")
@@ -230,6 +231,7 @@ model DogMeasurement {
 model Activity {
   id               String             @id @default(uuid()) @db.Uuid
   creatorId        String             @map("creator_id") @db.Uuid
+  sourceRideId     String?            @map("source_ride_id") @db.Uuid
   place            String?            @db.VarChar(50)
   visibility       ActivityVisibility
   type             ActivityType
@@ -250,6 +252,7 @@ model Activity {
   updatedAt        DateTime           @updatedAt @map("updated_at")
 
   creator     User                 @relation("ActivityCreator", fields: [creatorId], references: [id])
+  sourceRide  Ride?                @relation(fields: [sourceRideId], references: [id], onDelete: SetNull)
   invitations ActivityInvitation[]
   userActivities UserActivity[]
   steps       Step[]
@@ -257,7 +260,51 @@ model Activity {
 
   @@index([creatorId])
   @@index([geohash])
+  @@index([sourceRideId])
   @@map("activities")
+}
+
+model Ride {
+  id               String             @id @default(uuid()) @db.Uuid
+  creatorId        String             @map("creator_id") @db.Uuid
+  place            String?            @db.VarChar(50)
+  visibility       ActivityVisibility
+  type             ActivityType
+  style            ActivityStyle      @default(casual)
+  date             DateTime?
+  duration         String?            @db.VarChar(50)
+  participantLimit Int?               @map("participant_limit")
+  latitude         String?
+  longitude        String?
+  department       String?
+  country          String?
+  geohash          String?
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  creator    User         @relation("RideCreator", fields: [creatorId], references: [id])
+  steps      RideStep[]
+  activities Activity[]
+
+  @@index([creatorId])
+  @@index([geohash])
+  @@map("rides")
+}
+
+model RideStep {
+  id            BigInt    @id @default(autoincrement())
+  rideId        String    @map("ride_id") @db.Uuid
+  place         String?   @db.VarChar(100)
+  latitude      Float?
+  longitude     Float?
+  estimatedHour DateTime? @map("estimated_hour")
+  sortOrder     Int       @default(0) @map("sort_order")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([rideId, sortOrder])
+  @@map("ride_steps")
 }
 
 model ActivityInvitation {

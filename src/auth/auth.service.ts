@@ -31,14 +31,16 @@ export class AuthService {
         userStats: { create: {} },
         userPreferences: { create: {} },
       },
+      include: { role: true },
     });
 
-    return this.issueTokens(user.id, user.email);
+    return this.issueTokens(user.id, user.email, user.role.name);
   }
 
   async login(dto: LoginDto): Promise<AuthTokensDto> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
+      include: { role: true },
     });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -49,7 +51,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.issueTokens(user.id, user.email);
+    return this.issueTokens(user.id, user.email, user.role.name);
   }
 
   async refresh(refreshToken: string): Promise<AuthTokensDto> {
@@ -64,6 +66,7 @@ export class AuthService {
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
+        include: { role: true },
       });
       // The stored refresh token is hashed; compare against the presented one.
       const matches =
@@ -73,7 +76,7 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      return this.issueTokens(user.id, user.email);
+      return this.issueTokens(user.id, user.email, user.role.name);
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -89,8 +92,9 @@ export class AuthService {
   private async issueTokens(
     userId: string,
     email: string,
+    role: string,
   ): Promise<AuthTokensDto> {
-    const payload = { sub: userId, email };
+    const payload = { sub: userId, email, role };
     const accessToken = this.jwt.sign(payload, {
       secret: this.config.getOrThrow<string>('JWT_SECRET'),
       expiresIn: '15m',
