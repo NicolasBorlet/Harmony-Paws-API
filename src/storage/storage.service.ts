@@ -10,6 +10,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const STORAGE_BUCKETS = [
@@ -69,13 +70,13 @@ export class StorageService {
     });
   }
 
-  async getUploadUrl(bucket: string, key: string, userId: string) {
+  async getUploadUrl(bucket: string, key: string, user: AuthUser) {
     const safeBucket = this.validateBucket(bucket);
     this.validateKey(key);
     if (READ_ONLY_BUCKETS.has(safeBucket)) {
       throw new ForbiddenException('This bucket is read-only');
     }
-    await this.assertAccess(safeBucket, key, userId, 'write');
+    await this.assertAccess(safeBucket, key, user, 'write');
     const contentType = this.resolveContentType(safeBucket, key);
     const command = new PutObjectCommand({
       Bucket: safeBucket,
@@ -86,10 +87,10 @@ export class StorageService {
     return { url, bucket: safeBucket, key, contentType };
   }
 
-  async getDownloadUrl(bucket: string, key: string, userId: string) {
+  async getDownloadUrl(bucket: string, key: string, user: AuthUser) {
     const safeBucket = this.validateBucket(bucket);
     this.validateKey(key);
-    await this.assertAccess(safeBucket, key, userId, 'read');
+    await this.assertAccess(safeBucket, key, user, 'read');
     const command = new GetObjectCommand({ Bucket: safeBucket, Key: key });
     const url = await getSignedUrl(this.client, command, { expiresIn: 3600 });
     return { url, bucket: safeBucket, key };
@@ -131,7 +132,7 @@ export class StorageService {
   private async assertAccess(
     bucket: StorageBucket,
     key: string,
-    userId: string,
+    user: AuthUser,
     operation: StorageOperation,
   ) {
     // Shared catalog buckets: read allowed for any authenticated user, writes
@@ -145,7 +146,7 @@ export class StorageService {
 
     if (bucket === 'users') {
       const targetUserId = key.replace(/\.(jpeg|jpg|png|webp)$/, '');
-      if (targetUserId !== userId) {
+      if (targetUserId !== user.id) {
         throw new ForbiddenException('Cannot access this user image');
       }
       return;
@@ -153,18 +154,32 @@ export class StorageService {
 
     if (bucket === 'dogs') {
       const dogId = key.replace(/\.(jpeg|jpg|png|webp)$/, '');
-      await this.assertDogOwner(dogId, userId, 'Cannot access this dog image');
+      await this.assertDogOwner(dogId, user.id, 'Cannot access this dog image');
       return;
     }
 
     if (bucket === 'rides') {
-      const activityId = key.replace(/\.(jpeg|jpg|png|webp)$/, '');
+      const objectId = key.replace(/\.(jpeg|jpg|png|webp)$/, '');
+      if (!this.isUuid(objectId)) {
+        throw new BadRequestException('Invalid object key');
+      }
+
+      const ride = await this.prisma.ride.findUnique({
+        where: { id: objectId },
+        select: { id: true, creatorId: true },
+      });
+      if (ride) {
+        if (operation === 'read') return;
+        if (user.role === 'admin' || ride.creatorId === user.id) return;
+        throw new ForbiddenException('Cannot access this ride image');
+      }
+
       const activity = await this.prisma.activity.findFirst({
         where: {
-          id: activityId,
+          id: objectId,
           OR: [
-            { creatorId: userId },
-            { userActivities: { some: { userId } } },
+            { creatorId: user.id },
+            { userActivities: { some: { userId: user.id } } },
           ],
         },
       });
@@ -183,7 +198,7 @@ export class StorageService {
       }
       await this.assertDogOwner(
         segments[0],
-        userId,
+        user.id,
         'Cannot access these documents',
       );
       return;

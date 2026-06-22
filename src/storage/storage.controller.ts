@@ -44,7 +44,7 @@ export class StorageController {
     @Param('key') key: string,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.storage.getDownloadUrl(bucket, decodeURIComponent(key), user.id);
+    return this.storage.getDownloadUrl(bucket, decodeURIComponent(key), user);
   }
 
   @Post(':bucket/:key/upload-url')
@@ -62,7 +62,7 @@ export class StorageController {
     @Param('key') key: string,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.storage.getUploadUrl(bucket, decodeURIComponent(key), user.id);
+    return this.storage.getUploadUrl(bucket, decodeURIComponent(key), user);
   }
 
   @Post('dogs/:dogId/upload-url')
@@ -81,6 +81,6 @@ export class StorageController {
     @Param('dogId') dogId: string,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.storage.getUploadUrl('dogs', `${dogId}.jpeg`, user.id);
+    return this.storage.getUploadUrl('dogs', `${dogId}.jpeg`, user);
   }
 }
