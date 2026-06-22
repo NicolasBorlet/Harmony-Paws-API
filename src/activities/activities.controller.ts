@@ -20,18 +20,12 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
-import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
-import { ActivitiesService } from './activities.service';
 import {
-  CreateActivityDto,
-  CreateInvitationDto,
-  SaveActivityStatsDto,
-  SaveLivePushTokenDto,
-  UpdateActivityDto,
-  UpdateActivityStatusDto,
-} from './dto/activities.dto';
+  AuthUser,
+  CurrentUser,
+} from '../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
 import {
   ApiJwtAuth,
   ApiStandardResponses,
@@ -41,6 +35,15 @@ import {
   ActivityResponseDto,
   ActivityStatsResponseDto,
 } from '../common/swagger/dto/responses/activity-social.response.dto';
+import { ActivitiesService } from './activities.service';
+import {
+  CreateActivityDto,
+  CreateInvitationDto,
+  SaveActivityStatsDto,
+  SaveLivePushTokenDto,
+  UpdateActivityDto,
+  UpdateActivityStatusDto,
+} from './dto/activities.dto';
 
 @ApiTags('activities')
 @Controller('activities')
@@ -52,7 +55,7 @@ export class ActivitiesController {
   @Get()
   @ApiOperation({
     summary: 'Mes balades',
-    description: 'Activités créées ou auxquelles l\'utilisateur participe.',
+    description: "Activités créées ou auxquelles l'utilisateur participe.",
   })
   @ApiOkResponse({ type: [ActivityResponseDto] })
   @ApiStandardResponses({ unauthorized: true })
@@ -63,13 +66,14 @@ export class ActivitiesController {
   @Get('discover')
   @ApiOperation({
     summary: 'Découvrir des balades publiques',
-    description: 'Filtre les activités publiques par préfixe geohash.',
+    description:
+      'Retourne les balades publiques à venir. Le geohash sert uniquement au tri par proximité (les plus proches en premier). Sans geohash, tri par date.',
   })
   @ApiQuery({
     name: 'geohash',
     required: false,
     example: 'u09tvw',
-    description: 'Préfixe geohash de la zone géographique',
+    description: 'Geohash de référence pour trier par proximité',
   })
   @ApiOkResponse({ type: [ActivityResponseDto] })
   @ApiStandardResponses({ unauthorized: true })
@@ -80,7 +84,8 @@ export class ActivitiesController {
   @Get('invitations')
   @ApiOperation({
     summary: 'Mes invitations reçues',
-    description: 'Invitations en attente ou historiques pour l\'utilisateur connecté.',
+    description:
+      "Invitations en attente ou historiques pour l'utilisateur connecté.",
   })
   @ApiOkResponse({ type: [ActivityInvitationResponseDto] })
   @ApiStandardResponses({ unauthorized: true })
@@ -110,7 +115,7 @@ export class ActivitiesController {
   @ApiOperation({ summary: 'Accepter une invitation' })
   @ApiParam({
     name: 'id',
-    description: 'Identifiant numérique de l\'invitation',
+    description: "Identifiant numérique de l'invitation",
     example: '1',
   })
   @ApiOkResponse({ type: ActivityInvitationResponseDto })
@@ -123,8 +128,8 @@ export class ActivitiesController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Détail d\'une balade' })
-  @ApiParam({ name: 'id', description: 'UUID de l\'activité' })
+  @ApiOperation({ summary: "Détail d'une balade" })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
   @ApiOkResponse({ type: ActivityResponseDto })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
@@ -134,7 +139,7 @@ export class ActivitiesController {
   @Post()
   @ApiOperation({
     summary: 'Créer une balade',
-    description: 'L\'utilisateur connecté devient le créateur de l\'activité.',
+    description: "L'utilisateur connecté devient le créateur de l'activité.",
   })
   @ApiCreatedResponse({ type: ActivityResponseDto })
   @ApiStandardResponses({ unauthorized: true })
@@ -148,7 +153,7 @@ export class ActivitiesController {
     description:
       'Transition de statut (not_started → in_progress → finished, etc.) avec état live optionnel.',
   })
-  @ApiParam({ name: 'id', description: 'UUID de l\'activité' })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
   @ApiOkResponse({ type: ActivityResponseDto })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   updateStatus(
@@ -166,9 +171,10 @@ export class ActivitiesController {
   @Post(':id/stats')
   @ApiOperation({
     summary: 'Enregistrer les statistiques GPS',
-    description: 'Sauvegarde distance, durée, trace GPS et métriques de fin de balade.',
+    description:
+      'Sauvegarde distance, durée, trace GPS et métriques de fin de balade.',
   })
-  @ApiParam({ name: 'id', description: 'UUID de l\'activité' })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
   @ApiOkResponse({ type: ActivityStatsResponseDto })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   saveStats(
@@ -185,9 +191,10 @@ export class ActivitiesController {
   @Post(':id/live-push-token')
   @ApiOperation({
     summary: 'Enregistrer le token push live',
-    description: 'Permet d\'envoyer des notifications temps réel pendant la balade.',
+    description:
+      "Permet d'envoyer des notifications temps réel pendant la balade.",
   })
-  @ApiParam({ name: 'id', description: 'UUID de l\'activité' })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
   @ApiOkResponse({ description: 'Token enregistré' })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   saveLivePushToken(
@@ -205,24 +212,22 @@ export class ActivitiesController {
   @Post(':id/live-push-token/clear')
   @ApiOperation({
     summary: 'Supprimer le token push live',
-    description: 'Appelé à la fin de la balade ou en quittant l\'écran live.',
+    description: "Appelé à la fin de la balade ou en quittant l'écran live.",
   })
-  @ApiParam({ name: 'id', description: 'UUID de l\'activité' })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
   @ApiOkResponse({ description: 'Token supprimé' })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
-  clearLivePushToken(
-    @Param('id') id: string,
-    @CurrentUser() user: AuthUser,
-  ) {
+  clearLivePushToken(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.activitiesService.clearLivePushToken(id, user.id);
   }
 
   @Patch(':id')
   @ApiOperation({
     summary: 'Mettre à jour une balade',
-    description: 'Seul le créateur peut modifier les informations de la balade.',
+    description:
+      'Seul le créateur peut modifier les informations de la balade.',
   })
-  @ApiParam({ name: 'id', description: 'UUID de l\'activité' })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
   @ApiOkResponse({ type: ActivityResponseDto })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   update(
@@ -239,7 +244,7 @@ export class ActivitiesController {
     summary: 'Supprimer une balade',
     description: 'Seul le créateur peut supprimer la balade.',
   })
-  @ApiParam({ name: 'id', description: 'UUID de l\'activité' })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
   @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.activitiesService.delete(id, user.id);

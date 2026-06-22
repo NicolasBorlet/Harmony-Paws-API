@@ -17,6 +17,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { serialize, decimalToNumber } from '../common/utils/serialize';
 import { EventsGateway, WS_EVENTS } from '../websocket/events.gateway';
 
+function geohashCommonPrefixLength(
+  geohash: string | null | undefined,
+  reference: string,
+): number {
+  if (!geohash) return 0;
+  let i = 0;
+  const max = Math.min(geohash.length, reference.length);
+  while (i < max && geohash[i] === reference[i]) i++;
+  return i;
+}
+
 @Injectable()
 export class ActivitiesService {
   constructor(
@@ -381,21 +392,26 @@ export class ActivitiesService {
   }
 
   async discoverByGeohash(geohashPrefix: string) {
-    // Require a minimum precision to avoid dumping every public activity
-    // worldwide by paginating over short prefixes.
-    const prefix = geohashPrefix.trim();
-    if (prefix.length < 3) {
-      return [];
-    }
+    const referenceGeohash = geohashPrefix.trim();
     const activities = await this.prisma.activity.findMany({
       where: {
         visibility: 'public',
-        geohash: { startsWith: prefix },
         status: { in: ['not_started', 'ready_to_start'] },
       },
-      take: 50,
     });
-    return serialize(activities);
+
+    const sorted =
+      referenceGeohash.length >= 3
+        ? [...activities].sort((a, b) => {
+            const proximityDiff =
+              geohashCommonPrefixLength(b.geohash, referenceGeohash) -
+              geohashCommonPrefixLength(a.geohash, referenceGeohash);
+            if (proximityDiff !== 0) return proximityDiff;
+            return a.date.getTime() - b.date.getTime();
+          })
+        : [...activities].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    return serialize(sorted.slice(0, 50));
   }
 
   private async assertParticipant(activityId: string, userId: string) {
