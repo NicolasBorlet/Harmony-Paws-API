@@ -84,13 +84,52 @@ export class UsersService {
     return serialize(rest);
   }
 
-  async getPublicProfile(userId: string) {
+  async getPublicProfile(userId: string, requesterId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: this.publicProfileSelect,
+      select: {
+        ...this.publicProfileSelect,
+        userPreferences: { select: { publicProfile: true } },
+      },
     });
     if (!user) throw new NotFoundException('User not found');
-    return serialize(user);
+    this.assertVisible(
+      userId,
+      requesterId,
+      user.userPreferences?.publicProfile,
+    );
+    const { userPreferences: _userPreferences, ...rest } = user;
+    return serialize(rest);
+  }
+
+  /**
+   * Enforces the `publicProfile` privacy preference. A user can always see their
+   * own profile; otherwise a profile marked non-public is hidden. We throw 404
+   * (not 403) so the endpoint does not reveal that the account exists.
+   */
+  async assertProfileVisible(userId: string, requesterId: string) {
+    if (userId === requesterId) return;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { userPreferences: { select: { publicProfile: true } } },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    this.assertVisible(
+      userId,
+      requesterId,
+      user.userPreferences?.publicProfile,
+    );
+  }
+
+  private assertVisible(
+    userId: string,
+    requesterId: string,
+    publicProfile: boolean | undefined,
+  ) {
+    // Missing preferences default to public (see DEFAULT_PREFERENCES).
+    if (userId !== requesterId && publicProfile === false) {
+      throw new NotFoundException('User not found');
+    }
   }
 
   async updateProfile(userId: string, data: UpdateProfileDto) {

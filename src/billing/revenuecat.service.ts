@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import {
   Injectable,
   InternalServerErrorException,
@@ -42,26 +43,43 @@ export class RevenueCatService {
 
   verifyWebhookAuthorization(authHeader: string | undefined): void {
     const expected = this.config.get<string>('REVENUECAT_WEBHOOK_AUTHORIZATION');
+    // Fail closed: an unauthenticated webhook lets anyone grant premium to any
+    // account, so a missing secret is a misconfiguration we refuse outright
+    // rather than silently skipping the check.
     if (!expected) {
-      this.logger.warn(
-        'REVENUECAT_WEBHOOK_AUTHORIZATION is not set — webhook auth skipped',
+      this.logger.error(
+        'REVENUECAT_WEBHOOK_AUTHORIZATION is not set — refusing webhook',
       );
-      return;
+      throw new UnauthorizedException('Webhook authorization not configured');
     }
-    if (authHeader !== expected) {
+    if (!authHeader || !this.safeEqual(authHeader, expected)) {
       throw new UnauthorizedException('Invalid webhook authorization');
     }
+  }
+
+  // Constant-time comparison so the shared secret cannot be recovered by
+  // measuring response timing.
+  private safeEqual(a: string, b: string): boolean {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      return false;
+    }
+    return timingSafeEqual(bufA, bufB);
   }
 
   private shouldGrantPremium(event: RevenueCatWebhookEvent): boolean {
     const premiumEntitlementId = this.getPremiumEntitlementId();
     const ids = event.entitlement_ids;
 
+    // Only grant premium when RevenueCat explicitly reports the configured
+    // premium entitlement. An empty or non-matching list must not unlock
+    // premium — otherwise any product/event would do.
     if (!ids?.length) {
       this.logger.warn(
-        `Webhook ${event.type}: entitlement_ids is empty — granting premium (map your product to entitlement "${premiumEntitlementId}" in RevenueCat)`,
+        `Webhook ${event.type}: entitlement_ids is empty — not granting premium (map your product to entitlement "${premiumEntitlementId}" in RevenueCat)`,
       );
-      return true;
+      return false;
     }
 
     if (ids.includes(premiumEntitlementId)) {
@@ -69,9 +87,9 @@ export class RevenueCatService {
     }
 
     this.logger.warn(
-      `Webhook ${event.type}: entitlement_ids=[${ids.join(', ')}] does not include "${premiumEntitlementId}" — granting premium (update REVENUECAT_PREMIUM_ENTITLEMENT_ID if needed)`,
+      `Webhook ${event.type}: entitlement_ids=[${ids.join(', ')}] does not include "${premiumEntitlementId}" — not granting premium (update REVENUECAT_PREMIUM_ENTITLEMENT_ID if needed)`,
     );
-    return true;
+    return false;
   }
 
   private shouldRevokePremium(event: RevenueCatWebhookEvent): boolean {
@@ -156,9 +174,13 @@ export class RevenueCatService {
     const premiumEntitlementId = this.getPremiumEntitlementId();
     const configuredEntitlement =
       data.subscriber.entitlements[premiumEntitlementId];
-    const isPremium =
-      this.isEntitlementActive(configuredEntitlement, data.request_date_ms) ||
-      this.hasAnyActiveEntitlement(data);
+    // Premium is only unlocked by the configured premium entitlement. Granting
+    // it for *any* active entitlement would let a cheaper/other tier bypass the
+    // paywall.
+    const isPremium = this.isEntitlementActive(
+      configuredEntitlement,
+      data.request_date_ms,
+    );
     const customerId = data.subscriber.original_app_user_id ?? userId;
 
     await this.setPremium(userId, customerId, isPremium);
@@ -187,14 +209,6 @@ export class RevenueCatService {
     }
 
     return false;
-  }
-
-  private hasAnyActiveEntitlement(
-    data: RevenueCatSubscriberResponse,
-  ): boolean {
-    return Object.values(data.subscriber.entitlements).some((entitlement) =>
-      this.isEntitlementActive(entitlement, data.request_date_ms),
-    );
   }
 
   private async resolveUserId(
