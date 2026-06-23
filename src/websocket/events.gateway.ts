@@ -18,6 +18,7 @@ export const WS_EVENTS = {
   ACTIVITY_STATUS: 'activity:status',
   PARTICIPANT_JOINED: 'participant:joined',
   ACTIVITY_BANNER: 'activity:banner',
+  BADGE_UNLOCKED: 'badge:unlocked',
 } as const;
 
 @Injectable()

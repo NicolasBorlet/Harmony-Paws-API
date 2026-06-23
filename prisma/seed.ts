@@ -1,7 +1,60 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { BADGE_CATEGORIES, BADGES } from './data/badges.seed';
 
 const prisma = new PrismaClient();
+
+async function seedBadges() {
+  // Categories first so badges can reference them by id.
+  const categoryIdByCode = new Map<string, string>();
+  for (const category of BADGE_CATEGORIES) {
+    const row = await prisma.badgeCategory.upsert({
+      where: { code: category.code },
+      update: {
+        nameKey: category.nameKey,
+        icon: category.icon,
+        color: category.color,
+        displayOrder: category.displayOrder,
+        isActive: true,
+      },
+      create: {
+        code: category.code,
+        nameKey: category.nameKey,
+        icon: category.icon,
+        color: category.color,
+        displayOrder: category.displayOrder,
+      },
+    });
+    categoryIdByCode.set(category.code, row.id);
+  }
+
+  for (const b of BADGES) {
+    const categoryId = categoryIdByCode.get(b.categoryCode) ?? null;
+    const data = {
+      categoryId,
+      nameKey: b.nameKey,
+      descriptionKey: b.descriptionKey,
+      icon: b.icon,
+      points: b.points,
+      requirementType: b.requirementType,
+      requirementValue: b.requirementValue,
+      requirementUnit: b.requirementUnit,
+      isSecret: b.isSecret,
+      rarity: b.rarity,
+      displayOrder: b.displayOrder,
+      isActive: true,
+    };
+    await prisma.badge.upsert({
+      where: { code: b.code },
+      update: data,
+      create: { code: b.code, ...data },
+    });
+  }
+
+  console.log(
+    `Seeded ${BADGE_CATEGORIES.length} badge categories and ${BADGES.length} badges.`,
+  );
+}
 
 async function main() {
   const userRole = await prisma.role.upsert({
@@ -16,7 +69,13 @@ async function main() {
     create: { name: 'admin' },
   });
 
-  const breeds = ['Labrador', 'Golden Retriever', 'Berger Allemand', 'Bulldog', 'Caniche'];
+  const breeds = [
+    'Labrador',
+    'Golden Retriever',
+    'Berger Allemand',
+    'Bulldog',
+    'Caniche',
+  ];
   for (const name of breeds) {
     await prisma.breed.upsert({
       where: { name },
@@ -64,6 +123,8 @@ async function main() {
       userPreferences: { create: {} },
     },
   });
+
+  await seedBadges();
 }
 
 main()

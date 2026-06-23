@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -16,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { serialize, decimalToNumber } from '../common/utils/serialize';
 import { EventsGateway, WS_EVENTS } from '../websocket/events.gateway';
+import { BadgeEngineService } from '../stats-badges/badge-engine.service';
 
 function geohashCommonPrefixLength(
   geohash: string | null | undefined,
@@ -30,9 +32,12 @@ function geohashCommonPrefixLength(
 
 @Injectable()
 export class ActivitiesService {
+  private readonly logger = new Logger(ActivitiesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
+    private readonly badgeEngine: BadgeEngineService,
   ) {}
 
   async listForUser(userId: string) {
@@ -268,6 +273,13 @@ export class ActivitiesService {
 
     if (data.isCompleted) {
       await this.syncUserStats(userId, stats);
+      // Badge evaluation is best-effort: a failure here must never prevent the
+      // activity stats from being saved.
+      try {
+        await this.badgeEngine.evaluateAndAward(userId);
+      } catch (error) {
+        this.logger.warn(`Badge evaluation failed for ${userId}: ${error}`);
+      }
     }
 
     return serialize({
