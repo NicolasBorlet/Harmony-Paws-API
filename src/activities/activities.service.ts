@@ -290,7 +290,7 @@ export class ActivitiesService {
 
   async listInvitations(userId: string) {
     const invitations = await this.prisma.activityInvitation.findMany({
-      where: { OR: [{ receiverId: userId }, { senderId: userId }] },
+      where: { receiverId: userId },
       include: { activity: true, sender: true, receiver: true },
       orderBy: { createdAt: 'desc' },
     });
