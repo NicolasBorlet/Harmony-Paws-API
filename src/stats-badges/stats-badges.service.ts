@@ -31,8 +31,30 @@ export class StatsBadgesService {
     return serialize(
       await this.prisma.badgeCategory.findMany({
         where: { isActive: true },
-        include: { badges: { where: { isActive: true } } },
+        include: {
+          badges: {
+            where: { isActive: true },
+            orderBy: { displayOrder: 'asc' },
+          },
+        },
         orderBy: { displayOrder: 'asc' },
+      }),
+    );
+  }
+
+  /**
+   * Flat catalog of every active, non-secret badge. Secret badges are excluded
+   * so they stay hidden until a user actually unlocks them.
+   */
+  async listBadges() {
+    return serialize(
+      await this.prisma.badge.findMany({
+        where: { isActive: true, isSecret: false },
+        include: { category: true },
+        orderBy: [
+          { category: { displayOrder: 'asc' } },
+          { displayOrder: 'asc' },
+        ],
       }),
     );
   }

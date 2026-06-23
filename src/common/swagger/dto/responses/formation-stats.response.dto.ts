@@ -90,20 +90,61 @@ export class BadgeResponseDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   id: string;
 
-  @ApiProperty({ example: 'first_10km' })
+  @ApiProperty({ example: 'explorateur_10' })
   code: string;
 
-  @ApiProperty({ example: 'badge.first_10km.name' })
+  @ApiProperty({ example: 'badge.explorateur_10.name' })
   name_key: string;
 
-  @ApiProperty({ example: 'badge.first_10km.description' })
+  @ApiProperty({ example: 'badge.explorateur_10.description' })
   description_key: string;
 
-  @ApiProperty({ example: 50 })
+  @ApiPropertyOptional({ example: 'explore' })
+  icon?: string | null;
+
+  @ApiProperty({ example: 25 })
   points: number;
+
+  @ApiPropertyOptional({ example: 'total_distance_km' })
+  requirement_type?: string | null;
+
+  @ApiPropertyOptional({ example: 10 })
+  requirement_value?: number | null;
+
+  @ApiPropertyOptional({ example: 'km' })
+  requirement_unit?: string | null;
+
+  @ApiProperty({ example: false })
+  is_secret: boolean;
 
   @ApiPropertyOptional({ example: 'common' })
   rarity?: string | null;
+
+  @ApiPropertyOptional({ type: BadgeCategoryResponseDto })
+  category?: BadgeCategoryResponseDto;
+}
+
+export class BadgeProgressResponseDto extends BadgeResponseDto {
+  @ApiProperty({ example: false })
+  earned: boolean;
+
+  @ApiPropertyOptional({ example: '2026-06-19T08:00:00.000Z' })
+  earned_at?: string | null;
+
+  @ApiPropertyOptional({
+    example: 6.5,
+    description: 'Valeur actuelle de la métrique',
+  })
+  current_value?: number | null;
+
+  @ApiPropertyOptional({ example: 10, description: 'Objectif à atteindre' })
+  target_value?: number | null;
+
+  @ApiProperty({
+    example: 0.65,
+    description: 'Progression normalisée entre 0 et 1',
+  })
+  progress: number;
 }
 
 export class UserBadgeResponseDto {
