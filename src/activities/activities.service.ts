@@ -14,10 +14,10 @@ import {
   ActivityVisibility,
   Prisma,
 } from '@prisma/client';
+import { decimalToNumber, serialize } from '../common/utils/serialize';
 import { PrismaService } from '../prisma/prisma.service';
-import { serialize, decimalToNumber } from '../common/utils/serialize';
-import { EventsGateway, WS_EVENTS } from '../websocket/events.gateway';
 import { BadgeEngineService } from '../stats-badges/badge-engine.service';
+import { EventsGateway, WS_EVENTS } from '../websocket/events.gateway';
 
 function geohashCommonPrefixLength(
   geohash: string | null | undefined,
@@ -43,13 +43,14 @@ export class ActivitiesService {
   async listForUser(userId: string) {
     const activities = await this.prisma.activity.findMany({
       where: {
-        OR: [
-          { creatorId: userId },
-          { userActivities: { some: { userId } } },
-        ],
+        OR: [{ creatorId: userId }, { userActivities: { some: { userId } } }],
       },
       include: {
-        userActivities: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
+        userActivities: {
+          include: {
+            user: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
         steps: { orderBy: { sortOrder: 'asc' } },
       },
       orderBy: { date: 'desc' },
@@ -228,7 +229,11 @@ export class ActivitiesService {
     activityId: string,
     userId: string,
     status: ActivityStatus,
-    extra?: { startedAt?: string; endedAt?: string; currentState?: Prisma.InputJsonValue },
+    extra?: {
+      startedAt?: string;
+      endedAt?: string;
+      currentState?: Prisma.InputJsonValue;
+    },
   ) {
     // Only the creator may change the lifecycle status of an activity.
     await this.assertCreator(activityId, userId);
@@ -342,7 +347,11 @@ export class ActivitiesService {
       data: { senderId, receiverId, activityId },
       include: { activity: true },
     });
-    this.events.emitToUser(receiverId, WS_EVENTS.INVITATION_CHANGED, invitation);
+    this.events.emitToUser(
+      receiverId,
+      WS_EVENTS.INVITATION_CHANGED,
+      invitation,
+    );
     return serialize(invitation);
   }
 
@@ -372,7 +381,11 @@ export class ActivitiesService {
       }),
     ]);
 
-    this.events.emitToUser(invitation.senderId, WS_EVENTS.INVITATION_CHANGED, updated);
+    this.events.emitToUser(
+      invitation.senderId,
+      WS_EVENTS.INVITATION_CHANGED,
+      updated,
+    );
     this.events.emitToUser(userId, WS_EVENTS.INVITATION_CHANGED, updated);
     this.events.emitToActivity(
       invitation.activityId,
@@ -451,7 +464,10 @@ export class ActivitiesService {
 
   private async syncUserStats(
     userId: string,
-    stats: { distanceKm: Prisma.Decimal | null; durationMinutes: number | null },
+    stats: {
+      distanceKm: Prisma.Decimal | null;
+      durationMinutes: number | null;
+    },
   ) {
     const distance = decimalToNumber(stats.distanceKm) ?? 0;
     const duration = stats.durationMinutes ?? 0;
