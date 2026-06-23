@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { BadgeEngineService } from './badge-engine.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway } from '../websocket/events.gateway';
+import { RewardService } from './reward.service';
 
 /**
  * The engine is pure orchestration over Prisma, so we mock the data layer and
@@ -13,12 +14,15 @@ describe('BadgeEngineService', () => {
   let service: BadgeEngineService;
   let prisma: any;
   let events: { emitToUser: jest.Mock };
+  let rewardService: { awardReward: jest.Mock };
+  let tx: any;
 
   const dec = (n: number) => new Prisma.Decimal(n);
 
   const makeBadge = (over: Partial<any> = {}) => ({
     id: 'b1',
     code: 'explorateur_10',
+    points: 10,
     requirementType: 'total_distance_km',
     requirementValue: dec(10),
     isActive: true,
@@ -26,6 +30,12 @@ describe('BadgeEngineService', () => {
   });
 
   beforeEach(async () => {
+    tx = {
+      userBadge: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        upsert: jest.fn(),
+      },
+    };
     prisma = {
       userStats: { findUnique: jest.fn().mockResolvedValue(null) },
       user: { findUnique: jest.fn().mockResolvedValue({ isPremium: false }) },
@@ -38,17 +48,25 @@ describe('BadgeEngineService', () => {
       badge: { findMany: jest.fn(), findUnique: jest.fn() },
       userBadge: {
         findMany: jest.fn(),
+        findUnique: jest.fn(),
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
         upsert: jest.fn(),
       },
+      $transaction: jest.fn(async (fn: (client: typeof tx) => Promise<unknown>) =>
+        fn(tx),
+      ),
     };
     events = { emitToUser: jest.fn() };
+    rewardService = {
+      awardReward: jest.fn().mockResolvedValue({ awarded: true, level: 2 }),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         BadgeEngineService,
         { provide: PrismaService, useValue: prisma },
         { provide: EventsGateway, useValue: events },
+        { provide: RewardService, useValue: rewardService },
       ],
     }).compile();
 
@@ -66,10 +84,20 @@ describe('BadgeEngineService', () => {
 
     const result = await service.evaluateAndAward('u1');
 
-    expect(prisma.userBadge.createMany).toHaveBeenCalledWith({
+    expect(tx.userBadge.createMany).toHaveBeenCalledWith({
       data: [{ userId: 'u1', badgeId: 'b1' }],
       skipDuplicates: true,
     });
+    expect(rewardService.awardReward).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        userId: 'u1',
+        source: 'badge',
+        sourceId: 'b1',
+        points: 10,
+        experience: 100,
+      }),
+    );
     expect(events.emitToUser).toHaveBeenCalledWith(
       'u1',
       'badge:unlocked',
@@ -85,7 +113,7 @@ describe('BadgeEngineService', () => {
 
     const result = await service.evaluateAndAward('u1');
 
-    expect(prisma.userBadge.createMany).not.toHaveBeenCalled();
+    expect(tx.userBadge.createMany).not.toHaveBeenCalled();
     expect(events.emitToUser).not.toHaveBeenCalled();
     expect(result).toEqual([]);
   });
@@ -97,7 +125,7 @@ describe('BadgeEngineService', () => {
 
     const result = await service.evaluateAndAward('u1');
 
-    expect(prisma.userBadge.createMany).not.toHaveBeenCalled();
+    expect(tx.userBadge.createMany).not.toHaveBeenCalled();
     expect(result).toEqual([]);
   });
 

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Badge, ContentType } from '@prisma/client';
+import { Badge, ContentType, RewardSource } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway, WS_EVENTS } from '../websocket/events.gateway';
 import { decimalToNumber, serialize } from '../common/utils/serialize';
@@ -8,6 +8,8 @@ import {
   BadgeRequirementType,
   UserMetrics,
 } from './badge-requirements';
+import { computeBadgeReward } from './reward.constants';
+import { RewardService } from './reward.service';
 
 @Injectable()
 export class BadgeEngineService {
@@ -16,6 +18,7 @@ export class BadgeEngineService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
+    private readonly rewardService: RewardService,
   ) {}
 
   /**
@@ -120,9 +123,23 @@ export class BadgeEngineService {
 
     if (unlocked.length === 0) return [];
 
-    await this.prisma.userBadge.createMany({
-      data: unlocked.map((b) => ({ userId, badgeId: b.id })),
-      skipDuplicates: true,
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userBadge.createMany({
+        data: unlocked.map((b) => ({ userId, badgeId: b.id })),
+        skipDuplicates: true,
+      });
+
+      for (const badge of unlocked) {
+        const { points, experience } = computeBadgeReward(badge.points);
+        await this.rewardService.awardReward(tx, {
+          userId,
+          source: RewardSource.badge,
+          sourceId: badge.id,
+          points,
+          experience,
+          metadata: { badgeCode: badge.code },
+        });
+      }
     });
 
     // Re-read only the rows actually created in this pass (so concurrent
@@ -153,11 +170,31 @@ export class BadgeEngineService {
     const badge = await this.prisma.badge.findUnique({ where: { code } });
     if (!badge) return null;
 
-    const userBadge = await this.prisma.userBadge.upsert({
+    const existing = await this.prisma.userBadge.findUnique({
       where: { userId_badgeId: { userId, badgeId: badge.id } },
-      create: { userId, badgeId: badge.id },
-      update: {},
-      include: { badge: { include: { category: true } } },
+    });
+
+    const userBadge = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.userBadge.upsert({
+        where: { userId_badgeId: { userId, badgeId: badge.id } },
+        create: { userId, badgeId: badge.id },
+        update: {},
+        include: { badge: { include: { category: true } } },
+      });
+
+      if (!existing) {
+        const { points, experience } = computeBadgeReward(badge.points);
+        await this.rewardService.awardReward(tx, {
+          userId,
+          source: RewardSource.badge,
+          sourceId: badge.id,
+          points,
+          experience,
+          metadata: { badgeCode: badge.code },
+        });
+      }
+
+      return row;
     });
 
     return serialize(userBadge);

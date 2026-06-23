@@ -75,6 +75,11 @@ enum PurchaseStatus {
   failed
 }
 
+enum RewardSource {
+  badge
+  activity
+}
+
 // ---------------------------------------------------------------------------
 // Users & auth
 // ---------------------------------------------------------------------------
@@ -131,6 +136,7 @@ model User {
   userPreferences         UserPreferences?
   userStatsHistory        UserStatsHistory[]
   userBadges              UserBadge[]
+  userRewardEvents        UserRewardEvent[]
   formationFavorites      FormationFavorite[]
   activityLivePushTokens  ActivityLivePushToken[]
 
@@ -710,12 +716,32 @@ model UserStats {
   longestStreak         Int?     @default(0) @map("longest_streak")
   monthlyDistanceKm     Decimal? @default(0) @map("monthly_distance_km") @db.Decimal(12, 3)
   monthlyActivities     Int?     @default(0) @map("monthly_activities")
+  totalPoints           Int      @default(0) @map("total_points")
+  totalExperience       Int      @default(0) @map("total_experience")
+  level                 Int      @default(1)
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_stats")
+}
+
+model UserRewardEvent {
+  id         BigInt       @id @default(autoincrement())
+  userId     String       @map("user_id") @db.Uuid
+  source     RewardSource
+  sourceId   String       @map("source_id") @db.VarChar(100)
+  points     Int
+  experience Int
+  metadata   Json?
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, source, sourceId])
+  @@index([userId, createdAt])
+  @@map("user_reward_events")
 }
 
 model UserStatsHistory {

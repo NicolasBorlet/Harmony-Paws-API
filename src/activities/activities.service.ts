@@ -13,10 +13,16 @@ import {
   ActivityType,
   ActivityVisibility,
   Prisma,
+  RewardSource,
 } from '@prisma/client';
 import { decimalToNumber, serialize } from '../common/utils/serialize';
 import { PrismaService } from '../prisma/prisma.service';
 import { BadgeEngineService } from '../stats-badges/badge-engine.service';
+import {
+  computeActivityOs,
+  osToExperience,
+} from '../stats-badges/reward.constants';
+import { RewardService } from '../stats-badges/reward.service';
 import { EventsGateway, WS_EVENTS } from '../websocket/events.gateway';
 
 function geohashCommonPrefixLength(
@@ -38,6 +44,7 @@ export class ActivitiesService {
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
     private readonly badgeEngine: BadgeEngineService,
+    private readonly rewardService: RewardService,
   ) {}
 
   async listForUser(userId: string) {
@@ -277,7 +284,37 @@ export class ActivitiesService {
     });
 
     if (data.isCompleted) {
-      await this.syncUserStats(userId, stats);
+      if (!stats.syncedToUserStats) {
+        await this.syncUserStats(userId, stats);
+        await this.prisma.activityStats.update({
+          where: { activityId_userId: { activityId, userId } },
+          data: { syncedToUserStats: true },
+        });
+      }
+
+      try {
+        const distanceKm = decimalToNumber(stats.distanceKm) ?? 0;
+        const durationMinutes = stats.durationMinutes ?? 0;
+        const os = computeActivityOs(distanceKm, durationMinutes);
+
+        await this.prisma.$transaction(async (tx) => {
+          await this.rewardService.awardReward(tx, {
+            userId,
+            source: RewardSource.activity,
+            sourceId: stats.id,
+            points: os,
+            experience: osToExperience(os),
+            metadata: {
+              activityId,
+              distanceKm,
+              durationMinutes,
+            },
+          });
+        });
+      } catch (error) {
+        this.logger.warn(`Activity reward failed for ${userId}: ${error}`);
+      }
+
       // Badge evaluation is best-effort: a failure here must never prevent the
       // activity stats from being saved.
       try {

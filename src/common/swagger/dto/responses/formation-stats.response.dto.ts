@@ -67,6 +67,15 @@ export class UserStatsResponseDto {
 
   @ApiPropertyOptional({ example: 8 })
   monthly_activities?: number;
+
+  @ApiPropertyOptional({ example: 120, description: 'Total os (bones)' })
+  total_points?: number;
+
+  @ApiPropertyOptional({ example: 1200, description: 'Total XP cumulée' })
+  total_experience?: number;
+
+  @ApiPropertyOptional({ example: 3 })
+  level?: number;
 }
 
 export class BadgeCategoryResponseDto {
