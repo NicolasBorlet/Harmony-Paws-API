@@ -15,6 +15,14 @@ export class DogsService {
   private readonly dogInclude = {
     breed: true,
     dogBehaviors: { include: { behavior: true } },
+    owner: {
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        age: true,
+      },
+    },
   } as const;
 
   async listByOwner(ownerId: string) {
