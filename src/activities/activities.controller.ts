@@ -39,9 +39,12 @@ import { ActivitiesService } from './activities.service';
 import {
   CreateActivityDto,
   CreateInvitationDto,
+  AcceptInvitationDto,
+  JoinActivityDto,
   SaveActivityStatsDto,
   SaveLivePushTokenDto,
   UpdateActivityDto,
+  UpdateActivityDogsDto,
   UpdateActivityStatusDto,
 } from './dto/activities.dto';
 
@@ -123,8 +126,43 @@ export class ActivitiesController {
   acceptInvitation(
     @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: AuthUser,
+    @Body() body: AcceptInvitationDto,
   ) {
-    return this.activitiesService.acceptInvitation(id, user.id);
+    return this.activitiesService.acceptInvitation(id, user.id, body.dogIds);
+  }
+
+  @Post(':id/join')
+  @ApiOperation({
+    summary: 'Rejoindre une balade publique',
+    description:
+      'Rejoint une balade publique en sélectionnant un ou plusieurs chiens.',
+  })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
+  @ApiCreatedResponse({ type: ActivityResponseDto })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  joinActivity(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: JoinActivityDto,
+  ) {
+    return this.activitiesService.joinActivity(id, user.id, body.dogIds);
+  }
+
+  @Patch(':id/dogs')
+  @ApiOperation({
+    summary: 'Mettre à jour ses chiens sur une balade',
+    description:
+      'Remplace les chiens inscrits par le participant connecté (avant le démarrage).',
+  })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
+  @ApiOkResponse({ type: ActivityResponseDto })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  updateActivityDogs(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: UpdateActivityDogsDto,
+  ) {
+    return this.activitiesService.updateActivityDogs(id, user.id, body.dogIds);
   }
 
   @Get(':id')

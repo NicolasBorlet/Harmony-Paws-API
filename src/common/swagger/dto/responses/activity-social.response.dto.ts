@@ -5,8 +5,44 @@ import {
   ActivityStyle,
   ActivityType,
   ActivityVisibility,
+  DogDominance,
   FriendRequestStatus,
 } from '@prisma/client';
+import { BehaviorResponseDto } from './dog.response.dto';
+
+export class ActivityDogOwnerDto {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440001' })
+  id: string;
+
+  @ApiPropertyOptional({ example: 'Marie' })
+  first_name?: string | null;
+
+  @ApiPropertyOptional({ example: 'Dupont' })
+  last_name?: string | null;
+}
+
+export class ActivityDogResponseDto {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440010' })
+  id: string;
+
+  @ApiProperty({ example: 'Rex' })
+  name: string;
+
+  @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440010.jpeg' })
+  image?: string | null;
+
+  @ApiPropertyOptional({ enum: DogDominance, example: DogDominance.neutral })
+  dominance?: DogDominance | null;
+
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440001' })
+  owner_id: string;
+
+  @ApiPropertyOptional({ type: [BehaviorResponseDto] })
+  behaviors?: BehaviorResponseDto[];
+
+  @ApiPropertyOptional({ type: ActivityDogOwnerDto })
+  owner?: ActivityDogOwnerDto;
+}
 
 export class ActivityResponseDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -76,6 +112,9 @@ export class ActivityResponseDto {
 
   @ApiProperty({ example: '2026-06-19T10:00:00.000Z' })
   updated_at: string;
+
+  @ApiPropertyOptional({ type: [ActivityDogResponseDto] })
+  activity_dogs?: ActivityDogResponseDto[];
 }
 
 export class ActivityInvitationResponseDto {

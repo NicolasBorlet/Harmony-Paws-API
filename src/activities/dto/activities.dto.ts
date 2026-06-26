@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import {
   IsArray,
+  ArrayMinSize,
   IsBoolean,
   IsEnum,
   IsInt,
@@ -55,6 +56,18 @@ export class CreateActivityStepDto {
   @IsInt()
   @Min(0)
   sortOrder: number;
+}
+
+export class ActivityDogIdsDto {
+  @ApiProperty({
+    type: [String],
+    example: ['550e8400-e29b-41d4-a716-446655440010'],
+    description: 'UUIDs des chiens du participant (au moins un requis)',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID('4', { each: true })
+  dogIds: string[];
 }
 
 export class CreateActivityDto {
@@ -178,6 +191,16 @@ export class CreateActivityDto {
   @ValidateNested({ each: true })
   @Type(() => CreateActivityStepDto)
   steps?: CreateActivityStepDto[];
+
+  @ApiProperty({
+    type: [String],
+    example: ['550e8400-e29b-41d4-a716-446655440010'],
+    description: 'Chiens du créateur participant à la balade (au moins un requis)',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID('4', { each: true })
+  dogIds: string[];
 }
 
 export class UpdateActivityDto {
@@ -419,3 +442,9 @@ export class SaveLivePushTokenDto {
   })
   pushToken: string;
 }
+
+export class JoinActivityDto extends ActivityDogIdsDto {}
+
+export class AcceptInvitationDto extends ActivityDogIdsDto {}
+
+export class UpdateActivityDogsDto extends ActivityDogIdsDto {}

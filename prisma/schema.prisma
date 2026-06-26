@@ -139,6 +139,7 @@ model User {
   userRewardEvents        UserRewardEvent[]
   formationFavorites      FormationFavorite[]
   activityLivePushTokens  ActivityLivePushToken[]
+  activityDogs            ActivityDog[]
 
   @@map("users")
 }
@@ -198,6 +199,7 @@ model Dog {
   vaccinations Vaccination[]
   documents    Document[]
   healthReminders HealthReminder[]
+  activityDogs    ActivityDog[]
 
   @@index([ownerId])
   @@map("dogs")
@@ -261,6 +263,7 @@ model Activity {
   sourceRide  Ride?                @relation(fields: [sourceRideId], references: [id], onDelete: SetNull)
   invitations ActivityInvitation[]
   userActivities UserActivity[]
+  activityDogs   ActivityDog[]
   steps       Step[]
   stats       ActivityStats[]
 
@@ -268,6 +271,23 @@ model Activity {
   @@index([geohash])
   @@index([sourceRideId])
   @@map("activities")
+}
+
+model ActivityDog {
+  id         String   @id @default(uuid()) @db.Uuid
+  activityId String   @map("activity_id") @db.Uuid
+  dogId      String   @map("dog_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  dog      Dog      @relation(fields: [dogId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, dogId])
+  @@index([activityId])
+  @@index([userId])
+  @@map("activity_dogs")
 }
 
 model Ride {

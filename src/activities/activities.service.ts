@@ -36,6 +36,34 @@ function geohashCommonPrefixLength(
   return i;
 }
 
+const ACTIVITY_DOG_INCLUDE = {
+  include: {
+    dog: {
+      include: {
+        breed: true,
+        dogBehaviors: { include: { behavior: true } },
+      },
+    },
+    user: { select: { id: true, firstName: true, lastName: true } },
+  },
+};
+
+const ACTIVITY_DETAIL_INCLUDE = {
+  creator: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      age: true,
+      place: true,
+    },
+  },
+  userActivities: { include: { user: true } },
+  activityDogs: ACTIVITY_DOG_INCLUDE,
+  steps: { orderBy: { sortOrder: 'asc' as const } },
+  stats: true,
+};
+
 @Injectable()
 export class ActivitiesService {
   private readonly logger = new Logger(ActivitiesService.name);
@@ -58,30 +86,18 @@ export class ActivitiesService {
             user: { select: { id: true, firstName: true, lastName: true } },
           },
         },
+        activityDogs: ACTIVITY_DOG_INCLUDE,
         steps: { orderBy: { sortOrder: 'asc' } },
       },
       orderBy: { date: 'desc' },
     });
-    return serialize(activities);
+    return serialize(activities.map((activity) => this.mapActivityDogs(activity)));
   }
 
   async getById(activityId: string, userId: string) {
     const activity = await this.prisma.activity.findUnique({
       where: { id: activityId },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            age: true,
-            place: true,
-          },
-        },
-        userActivities: { include: { user: true } },
-        steps: { orderBy: { sortOrder: 'asc' } },
-        stats: true,
-      },
+      include: ACTIVITY_DETAIL_INCLUDE,
     });
     if (!activity) throw new NotFoundException('Activity not found');
     const isParticipant =
@@ -90,7 +106,7 @@ export class ActivitiesService {
     if (!isParticipant && activity.visibility === 'private') {
       throw new ForbiddenException('Not a participant');
     }
-    return serialize(activity);
+    return serialize(this.mapActivityDogs(activity));
   }
 
   async create(
@@ -116,9 +132,10 @@ export class ActivitiesService {
         estimatedHour: string;
         sortOrder: number;
       }[];
+      dogIds: string[];
     },
   ) {
-    const { steps, sourceRideId, ...activityData } = data;
+    const { steps, sourceRideId, dogIds, ...activityData } = data;
 
     if (sourceRideId) {
       const ride = await this.prisma.ride.findUnique({
@@ -130,8 +147,10 @@ export class ActivitiesService {
       }
     }
 
+    await this.assertDogsBelongToUser(dogIds, creatorId);
+
     const activity = await this.prisma.$transaction(async (tx) => {
-      return tx.activity.create({
+      const created = await tx.activity.create({
         data: {
           ...activityData,
           style: activityData.style ?? 'casual',
@@ -153,12 +172,25 @@ export class ActivitiesService {
               }
             : {}),
         },
-        include: { steps: { orderBy: { sortOrder: 'asc' } } },
+        include: {
+          steps: { orderBy: { sortOrder: 'asc' } },
+          activityDogs: ACTIVITY_DOG_INCLUDE,
+        },
+      });
+
+      await this.linkDogsToActivity(tx, created.id, creatorId, dogIds);
+
+      return tx.activity.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          steps: { orderBy: { sortOrder: 'asc' } },
+          activityDogs: ACTIVITY_DOG_INCLUDE,
+        },
       });
     });
 
     this.events.emitToUser(creatorId, WS_EVENTS.ACTIVITY_BANNER, activity);
-    return serialize(activity);
+    return serialize(this.mapActivityDogs(activity));
   }
 
   async update(
@@ -395,21 +427,29 @@ export class ActivitiesService {
     return serialize(invitation);
   }
 
-  async acceptInvitation(invitationId: bigint, userId: string) {
+  async acceptInvitation(
+    invitationId: bigint,
+    userId: string,
+    dogIds: string[],
+  ) {
     const invitation = await this.prisma.activityInvitation.findUnique({
       where: { id: invitationId },
+      include: { activity: { include: { userActivities: true } } },
     });
     if (!invitation) throw new NotFoundException('Invitation not found');
     if (invitation.receiverId !== userId) {
       throw new ForbiddenException('Not the receiver');
     }
 
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.activityInvitation.update({
+    await this.assertDogsBelongToUser(dogIds, userId);
+    await this.enforceParticipantLimit(invitation.activity);
+
+    const joinedDogs = await this.prisma.$transaction(async (tx) => {
+      await tx.activityInvitation.update({
         where: { id: invitationId },
         data: { status: ActivityInvitationStatus.accepted },
-      }),
-      this.prisma.userActivity.upsert({
+      });
+      await tx.userActivity.upsert({
         where: {
           userId_activityId: {
             userId,
@@ -418,21 +458,131 @@ export class ActivitiesService {
         },
         create: { userId, activityId: invitation.activityId },
         update: {},
-      }),
-    ]);
+      });
+      await this.linkDogsToActivity(
+        tx,
+        invitation.activityId,
+        userId,
+        dogIds,
+      );
+      return this.getActivityDogsForUser(tx, invitation.activityId, userId);
+    });
 
     this.events.emitToUser(
       invitation.senderId,
       WS_EVENTS.INVITATION_CHANGED,
-      updated,
+      { id: invitationId.toString(), status: ActivityInvitationStatus.accepted },
     );
-    this.events.emitToUser(userId, WS_EVENTS.INVITATION_CHANGED, updated);
+    this.events.emitToUser(userId, WS_EVENTS.INVITATION_CHANGED, {
+      id: invitationId.toString(),
+      status: ActivityInvitationStatus.accepted,
+    });
     this.events.emitToActivity(
       invitation.activityId,
       WS_EVENTS.PARTICIPANT_JOINED,
-      { userId, activityId: invitation.activityId },
+      {
+        userId,
+        activityId: invitation.activityId,
+        dogs: joinedDogs,
+      },
     );
-    return serialize(updated);
+    return serialize({
+      id: invitationId.toString(),
+      status: ActivityInvitationStatus.accepted,
+    });
+  }
+
+  async joinActivity(activityId: string, userId: string, dogIds: string[]) {
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      include: { userActivities: true },
+    });
+    if (!activity) throw new NotFoundException('Activity not found');
+
+    if (activity.visibility !== ActivityVisibility.public) {
+      throw new ForbiddenException('Only public activities can be joined directly');
+    }
+
+    if (
+      activity.status !== ActivityStatus.not_started &&
+      activity.status !== ActivityStatus.ready_to_start
+    ) {
+      throw new BadRequestException('Activity is no longer open for joining');
+    }
+
+    if (activity.date < new Date()) {
+      throw new BadRequestException('Activity date has passed');
+    }
+
+    const isAlreadyParticipant =
+      activity.creatorId === userId ||
+      activity.userActivities.some((ua) => ua.userId === userId);
+    if (isAlreadyParticipant) {
+      throw new ConflictException('Already a participant');
+    }
+
+    await this.assertDogsBelongToUser(dogIds, userId);
+    await this.enforceParticipantLimit(activity);
+
+    const joinedDogs = await this.prisma.$transaction(async (tx) => {
+      await tx.userActivity.create({
+        data: { userId, activityId },
+      });
+      await this.linkDogsToActivity(tx, activityId, userId, dogIds);
+      return this.getActivityDogsForUser(tx, activityId, userId);
+    });
+
+    this.events.emitToActivity(activityId, WS_EVENTS.PARTICIPANT_JOINED, {
+      userId,
+      activityId,
+      dogs: joinedDogs,
+    });
+
+    const fullActivity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      include: ACTIVITY_DETAIL_INCLUDE,
+    });
+
+    return serialize(this.mapActivityDogs(fullActivity!));
+  }
+
+  async updateActivityDogs(
+    activityId: string,
+    userId: string,
+    dogIds: string[],
+  ) {
+    await this.assertParticipant(activityId, userId);
+
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { status: true },
+    });
+    if (!activity) throw new NotFoundException('Activity not found');
+
+    if (
+      activity.status === ActivityStatus.in_progress ||
+      activity.status === ActivityStatus.finished
+    ) {
+      throw new BadRequestException(
+        'Cannot update dogs after the activity has started',
+      );
+    }
+
+    await this.assertDogsBelongToUser(dogIds, userId);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.activityDog.deleteMany({
+        where: { activityId, userId },
+      });
+      await this.linkDogsToActivity(tx, activityId, userId, dogIds);
+    });
+
+    const fullActivity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      include: ACTIVITY_DETAIL_INCLUDE,
+    });
+
+    return serialize(this.mapActivityDogs(fullActivity!));
   }
 
   async saveLivePushToken(
@@ -467,6 +617,10 @@ export class ActivitiesService {
         },
         date: { gte: now },
       },
+      include: {
+        activityDogs: ACTIVITY_DOG_INCLUDE,
+        userActivities: true,
+      },
     });
 
     const sorted =
@@ -480,7 +634,134 @@ export class ActivitiesService {
           })
         : [...activities].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    return serialize(sorted.slice(0, 50));
+    return serialize(
+      sorted.slice(0, 50).map((activity) => this.mapActivityDogs(activity)),
+    );
+  }
+
+  private mapActivityDogs(activity: {
+    activityDogs?: Array<{
+      id: string;
+      dogId: string;
+      userId: string;
+      dog: {
+        id: string;
+        name: string;
+        image: string | null;
+        dominance: string | null;
+        dogBehaviors: Array<{
+          behavior: { id: number; name: string };
+        }>;
+      };
+      user: {
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+      };
+    }>;
+    [key: string]: unknown;
+  }) {
+    if (!activity.activityDogs) return activity;
+
+    return {
+      ...activity,
+      activityDogs: activity.activityDogs.map((ad) => ({
+        id: ad.dog.id,
+        name: ad.dog.name,
+        image: ad.dog.image,
+        dominance: ad.dog.dominance,
+        owner_id: ad.userId,
+        behaviors: ad.dog.dogBehaviors.map((db) => db.behavior),
+        owner: {
+          id: ad.user.id,
+          firstName: ad.user.firstName,
+          lastName: ad.user.lastName,
+        },
+      })),
+    };
+  }
+
+  private async assertDogsBelongToUser(dogIds: string[], userId: string) {
+    const uniqueDogIds = [...new Set(dogIds)];
+    if (uniqueDogIds.length !== dogIds.length) {
+      throw new BadRequestException('Duplicate dog IDs are not allowed');
+    }
+
+    const dogs = await this.prisma.dog.findMany({
+      where: { id: { in: uniqueDogIds } },
+      select: { id: true, ownerId: true },
+    });
+
+    if (dogs.length !== uniqueDogIds.length) {
+      throw new NotFoundException('One or more dogs not found');
+    }
+
+    const invalid = dogs.filter((dog) => dog.ownerId !== userId);
+    if (invalid.length > 0) {
+      throw new ForbiddenException('Dogs must belong to the current user');
+    }
+
+    return dogs;
+  }
+
+  private async linkDogsToActivity(
+    tx: Prisma.TransactionClient,
+    activityId: string,
+    userId: string,
+    dogIds: string[],
+  ) {
+    if (dogIds.length === 0) {
+      throw new BadRequestException('At least one dog is required');
+    }
+
+    await tx.activityDog.createMany({
+      data: dogIds.map((dogId) => ({
+        activityId,
+        dogId,
+        userId,
+      })),
+    });
+  }
+
+  private async getActivityDogsForUser(
+    tx: Prisma.TransactionClient,
+    activityId: string,
+    userId: string,
+  ) {
+    const activityDogs = await tx.activityDog.findMany({
+      where: { activityId, userId },
+      include: {
+        dog: {
+          include: {
+            dogBehaviors: { include: { behavior: true } },
+          },
+        },
+      },
+    });
+
+    return activityDogs.map((ad) => ({
+      id: ad.dog.id,
+      name: ad.dog.name,
+      dominance: ad.dog.dominance,
+      behaviors: ad.dog.dogBehaviors.map((db) => db.behavior),
+    }));
+  }
+
+  private async enforceParticipantLimit(activity: {
+    participantLimit: number | null;
+    userActivities: Array<{ userId: string }>;
+    creatorId: string;
+  }) {
+    if (!activity.participantLimit) return;
+
+    const participantIds = new Set(
+      activity.userActivities.map((ua) => ua.userId),
+    );
+    participantIds.add(activity.creatorId);
+
+    if (participantIds.size >= activity.participantLimit) {
+      throw new ConflictException('Participant limit reached');
+    }
   }
 
   private async assertParticipant(activityId: string, userId: string) {
