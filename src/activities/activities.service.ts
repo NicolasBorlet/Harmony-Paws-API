@@ -242,8 +242,7 @@ export class ActivitiesService {
       currentState?: Prisma.InputJsonValue;
     },
   ) {
-    // Only the creator may change the lifecycle status of an activity.
-    await this.assertCreator(activityId, userId);
+    await this.assertParticipant(activityId, userId);
     const activity = await this.prisma.activity.update({
       where: { id: activityId },
       data: {
@@ -256,8 +255,12 @@ export class ActivitiesService {
     });
 
     this.events.emitToActivity(activityId, WS_EVENTS.ACTIVITY_STATUS, activity);
-    for (const ua of activity.userActivities) {
-      this.events.emitToUser(ua.userId, WS_EVENTS.ACTIVITY_BANNER, activity);
+    const notifiedUserIds = new Set(
+      activity.userActivities.map((ua) => ua.userId),
+    );
+    notifiedUserIds.add(activity.creatorId);
+    for (const notifiedUserId of notifiedUserIds) {
+      this.events.emitToUser(notifiedUserId, WS_EVENTS.ACTIVITY_BANNER, activity);
     }
     return serialize(activity);
   }
@@ -455,10 +458,14 @@ export class ActivitiesService {
 
   async discoverByGeohash(geohashPrefix: string) {
     const referenceGeohash = geohashPrefix.trim();
+    const now = new Date();
     const activities = await this.prisma.activity.findMany({
       where: {
         visibility: 'public',
-        status: { in: ['not_started', 'ready_to_start'] },
+        status: {
+          in: [ActivityStatus.not_started, ActivityStatus.ready_to_start],
+        },
+        date: { gte: now },
       },
     });
 
