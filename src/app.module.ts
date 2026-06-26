@@ -18,6 +18,7 @@ import { BillingModule } from './billing/billing.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SystemModule } from './system/system.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { SystemModule } from './system/system.module';
     StorageModule,
     NotificationsModule,
     BillingModule,
+    AdminModule,
   ],
   providers: [
     {
