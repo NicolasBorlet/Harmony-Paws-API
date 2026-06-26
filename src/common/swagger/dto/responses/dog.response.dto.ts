@@ -79,3 +79,32 @@ export class DiscoverDogsResponseDto {
   @ApiProperty({ example: true })
   has_more: boolean;
 }
+
+export class DogStatsResponseDto {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  dog_id: string;
+
+  @ApiProperty({ enum: ['none', 'basic', 'full'], example: 'basic' })
+  access: 'none' | 'basic' | 'full';
+
+  @ApiProperty({ example: true })
+  locked: boolean;
+
+  @ApiProperty({ example: 12, nullable: true })
+  total_activities: number | null;
+
+  @ApiProperty({ example: 480, nullable: true })
+  total_duration_minutes: number | null;
+
+  @ApiProperty({ example: 24.5, nullable: true })
+  total_distance_km: number | null;
+
+  @ApiProperty({ example: 8.2, nullable: true })
+  monthly_distance_km: number | null;
+
+  @ApiProperty({ example: 3, nullable: true })
+  monthly_activities: number | null;
+
+  @ApiProperty({ example: '2026-06-20T10:00:00.000Z', nullable: true })
+  last_activity_date: string | null;
+}

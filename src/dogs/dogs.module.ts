@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
+import { BillingModule } from '../billing/billing.module';
+import { StatsBadgesModule } from '../stats-badges/stats-badges.module';
 import { DogsController } from './dogs.controller';
 import { DogsService } from './dogs.service';
 
 @Module({
+  imports: [StatsBadgesModule, BillingModule],
   controllers: [DogsController],
   providers: [DogsService],
   exports: [DogsService],

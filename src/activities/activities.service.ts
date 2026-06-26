@@ -16,8 +16,10 @@ import {
   RewardSource,
 } from '@prisma/client';
 import { decimalToNumber, serialize } from '../common/utils/serialize';
+import { PremiumService } from '../billing/premium.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BadgeEngineService } from '../stats-badges/badge-engine.service';
+import { DogStatsService } from '../stats-badges/dog-stats.service';
 import {
   computeActivityOs,
   osToExperience,
@@ -73,6 +75,8 @@ export class ActivitiesService {
     private readonly events: EventsGateway,
     private readonly badgeEngine: BadgeEngineService,
     private readonly rewardService: RewardService,
+    private readonly premiumService: PremiumService,
+    private readonly dogStatsService: DogStatsService,
   ) {}
 
   async listForUser(userId: string) {
@@ -312,10 +316,22 @@ export class ActivitiesService {
     },
   ) {
     await this.assertParticipant(activityId, userId);
+
+    const isPremium = await this.premiumService.isPremium(userId);
+    const statsPayload = { ...data };
+
+    if (!isPremium && statsPayload.routePoints != null) {
+      this.logger.warn(
+        `Stripped GPS route data for non-premium user ${userId} on activity ${activityId}`,
+      );
+      delete statsPayload.routePoints;
+      delete statsPayload.distanceKm;
+    }
+
     const stats = await this.prisma.activityStats.upsert({
       where: { activityId_userId: { activityId, userId } },
-      create: { activityId, userId, ...data },
-      update: data,
+      create: { activityId, userId, ...statsPayload },
+      update: statsPayload,
     });
 
     if (data.isCompleted) {
@@ -324,6 +340,23 @@ export class ActivitiesService {
         await this.prisma.activityStats.update({
           where: { activityId_userId: { activityId, userId } },
           data: { syncedToUserStats: true },
+        });
+      }
+
+      if (!stats.syncedToDogStats) {
+        await this.dogStatsService.syncFromActivityStats(
+          activityId,
+          userId,
+          stats.id,
+          {
+            distanceKm: stats.distanceKm,
+            durationMinutes: stats.durationMinutes,
+            actualEndTime: stats.actualEndTime,
+          },
+        );
+        await this.prisma.activityStats.update({
+          where: { activityId_userId: { activityId, userId } },
+          data: { syncedToDogStats: true },
         });
       }
 

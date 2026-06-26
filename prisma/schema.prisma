@@ -140,6 +140,7 @@ model User {
   formationFavorites      FormationFavorite[]
   activityLivePushTokens  ActivityLivePushToken[]
   activityDogs            ActivityDog[]
+  activityDogStats        ActivityDogStats[]
 
   @@map("users")
 }
@@ -200,6 +201,8 @@ model Dog {
   documents    Document[]
   healthReminders HealthReminder[]
   activityDogs    ActivityDog[]
+  dogStats        DogStats?
+  activityDogStats ActivityDogStats[]
 
   @@index([ownerId])
   @@map("dogs")
@@ -266,6 +269,7 @@ model Activity {
   activityDogs   ActivityDog[]
   steps       Step[]
   stats       ActivityStats[]
+  activityDogStats ActivityDogStats[]
 
   @@index([creatorId])
   @@index([geohash])
@@ -400,14 +404,54 @@ model ActivityStats {
   temperatureCelsius   Decimal?  @map("temperature_celsius") @db.Decimal(4, 1)
   isCompleted          Boolean?  @default(false) @map("is_completed")
   syncedToUserStats    Boolean?  @default(false) @map("synced_to_user_stats")
+  syncedToDogStats     Boolean?  @default(false) @map("synced_to_dog_stats")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
   activity Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityDogStats ActivityDogStats[]
 
   @@unique([activityId, userId])
   @@map("activity_stats")
+}
+
+model DogStats {
+  id                   String    @id @default(uuid()) @db.Uuid
+  dogId                String    @unique @map("dog_id") @db.Uuid
+  totalDistanceKm      Decimal?  @default(0) @map("total_distance_km") @db.Decimal(12, 3)
+  totalActivities      Int?      @default(0) @map("total_activities")
+  totalDurationMinutes Int?      @default(0) @map("total_duration_minutes")
+  monthlyDistanceKm    Decimal?  @default(0) @map("monthly_distance_km") @db.Decimal(12, 3)
+  monthlyActivities    Int?      @default(0) @map("monthly_activities")
+  lastActivityDate     DateTime? @map("last_activity_date")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  dog Dog @relation(fields: [dogId], references: [id], onDelete: Cascade)
+
+  @@map("dog_stats")
+}
+
+model ActivityDogStats {
+  id              String   @id @default(uuid()) @db.Uuid
+  activityId      String   @map("activity_id") @db.Uuid
+  dogId           String   @map("dog_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  distanceKm      Decimal? @map("distance_km") @db.Decimal(12, 3)
+  durationMinutes Int?     @map("duration_minutes")
+  activityStatsId String   @map("activity_stats_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  activity      Activity      @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  dog           Dog           @relation(fields: [dogId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityStats ActivityStats @relation(fields: [activityStatsId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, dogId])
+  @@index([dogId])
+  @@index([userId])
+  @@map("activity_dog_stats")
 }
 
 model ActivityLivePushToken {

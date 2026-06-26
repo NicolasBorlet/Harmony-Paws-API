@@ -10,9 +10,11 @@ import {
   ActivityVisibility,
 } from '@prisma/client';
 import { ActivitiesService } from './activities.service';
+import { PremiumService } from '../billing/premium.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway } from '../websocket/events.gateway';
 import { BadgeEngineService } from '../stats-badges/badge-engine.service';
+import { DogStatsService } from '../stats-badges/dog-stats.service';
 import { RewardService } from '../stats-badges/reward.service';
 
 describe('ActivitiesService — activity dogs', () => {
@@ -69,6 +71,8 @@ describe('ActivitiesService — activity dogs', () => {
         { provide: EventsGateway, useValue: events },
         { provide: BadgeEngineService, useValue: { evaluateAndAward: jest.fn() } },
         { provide: RewardService, useValue: { awardReward: jest.fn() } },
+        { provide: PremiumService, useValue: { isPremium: jest.fn().mockResolvedValue(false) } },
+        { provide: DogStatsService, useValue: { syncFromActivityStats: jest.fn() } },
       ],
     }).compile();
 
@@ -227,5 +231,99 @@ describe('ActivitiesService — activity dogs', () => {
         service.updateActivityDogs(activityId, joinerId, [dogId]),
       ).rejects.toThrow(BadRequestException);
     });
+  });
+});
+
+describe('ActivitiesService — saveStats premium GPS gating', () => {
+  let service: ActivitiesService;
+  let prisma: Record<string, jest.Mock>;
+  let premiumService: { isPremium: jest.Mock };
+  let dogStatsService: { syncFromActivityStats: jest.Mock };
+
+  const activityId = 'activity-uuid';
+  const userId = 'user-uuid';
+
+  beforeEach(async () => {
+    premiumService = { isPremium: jest.fn().mockResolvedValue(false) };
+    dogStatsService = { syncFromActivityStats: jest.fn().mockResolvedValue(undefined) };
+
+    prisma = {
+      activity: { findUnique: jest.fn().mockResolvedValue({
+        id: activityId,
+        creatorId: userId,
+        userActivities: [],
+      }) },
+      activityStats: {
+        upsert: jest.fn().mockResolvedValue({
+          id: 'stats-uuid',
+          activityId,
+          userId,
+          distanceKm: null,
+          durationMinutes: 30,
+          syncedToUserStats: false,
+          syncedToDogStats: false,
+          actualEndTime: null,
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      userStats: { upsert: jest.fn().mockResolvedValue({}) },
+      $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn({})),
+    };
+
+    const module = await Test.createTestingModule({
+      providers: [
+        ActivitiesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: EventsGateway, useValue: { emitToActivity: jest.fn(), emitToUser: jest.fn() } },
+        { provide: BadgeEngineService, useValue: { evaluateAndAward: jest.fn() } },
+        { provide: RewardService, useValue: { awardReward: jest.fn() } },
+        { provide: PremiumService, useValue: premiumService },
+        { provide: DogStatsService, useValue: dogStatsService },
+      ],
+    }).compile();
+
+    service = module.get(ActivitiesService);
+  });
+
+  it('strips routePoints and distanceKm for non-premium users', async () => {
+    await service.saveStats(activityId, userId, {
+      distanceKm: 5,
+      durationMinutes: 30,
+      routePoints: [{ lat: 1, lng: 2 }],
+      isCompleted: false,
+    });
+
+    expect(prisma.activityStats.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.not.objectContaining({
+          routePoints: expect.anything(),
+          distanceKm: expect.anything(),
+        }),
+        update: expect.not.objectContaining({
+          routePoints: expect.anything(),
+          distanceKm: expect.anything(),
+        }),
+      }),
+    );
+  });
+
+  it('keeps routePoints for premium users', async () => {
+    premiumService.isPremium.mockResolvedValue(true);
+
+    await service.saveStats(activityId, userId, {
+      distanceKm: 5,
+      durationMinutes: 30,
+      routePoints: [{ lat: 1, lng: 2 }],
+      isCompleted: false,
+    });
+
+    expect(prisma.activityStats.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          routePoints: [{ lat: 1, lng: 2 }],
+          distanceKm: 5,
+        }),
+      }),
+    );
   });
 });

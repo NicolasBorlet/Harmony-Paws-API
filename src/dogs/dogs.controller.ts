@@ -19,6 +19,8 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { PremiumService } from '../billing/premium.service';
+import { DogStatsService } from '../stats-badges/dog-stats.service';
 import { DogsService } from './dogs.service';
 import { CreateDogDto, DiscoverDogsQueryDto, UpdateDogDto } from './dto/dogs.dto';
 import {
@@ -31,6 +33,7 @@ import {
   BreedResponseDto,
   DiscoverDogsResponseDto,
   DogResponseDto,
+  DogStatsResponseDto,
 } from '../common/swagger/dto/responses/dog.response.dto';
 
 @ApiTags('dogs')
@@ -38,7 +41,11 @@ import {
 @UseGuards(JwtAuthGuard)
 @ApiJwtAuth()
 export class DogsController {
-  constructor(private readonly dogsService: DogsService) {}
+  constructor(
+    private readonly dogsService: DogsService,
+    private readonly dogStatsService: DogStatsService,
+    private readonly premiumService: PremiumService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -97,6 +104,37 @@ export class DogsController {
   @ApiStandardResponses({ unauthorized: true })
   behaviors() {
     return this.dogsService.listBehaviors();
+  }
+
+  @Get('stats')
+  @ApiOperation({
+    summary: 'Statistiques de tous mes chiens',
+    description:
+      'Retourne les stats par chien avec gating premium (basique pour le chien principal, complet en premium).',
+  })
+  @ApiOkResponse({ type: [DogStatsResponseDto] })
+  @ApiStandardResponses({ unauthorized: true })
+  async listStats(@CurrentUser() user: AuthUser) {
+    const isPremium = await this.premiumService.isPremium(user.id);
+    return this.dogStatsService.listStatsForOwner(user.id, isPremium);
+  }
+
+  @Get(':id/stats')
+  @ApiOperation({
+    summary: 'Statistiques d\'un chien',
+    description:
+      'Stats basiques gratuites pour le chien principal ; premium requis pour les autres chiens et les métriques détaillées.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID du chien',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiOkResponse({ type: DogStatsResponseDto })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  async getStats(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    const isPremium = await this.premiumService.isPremium(user.id);
+    return this.dogStatsService.getStatsForDog(user.id, id, isPremium);
   }
 
   @Get(':id')
