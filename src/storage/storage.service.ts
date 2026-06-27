@@ -12,6 +12,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveS3Location } from './resolve-s3-location';
 
 export const STORAGE_BUCKETS = [
   'users',
@@ -48,7 +49,7 @@ const ALLOWED_CONTENT_TYPES: Record<string, string> = {
 @Injectable()
 export class StorageService {
   private readonly client: S3Client;
-  private readonly publicEndpoint: string;
+  private readonly physicalBucketName?: string;
 
   constructor(
     private readonly config: ConfigService,
@@ -57,16 +58,19 @@ export class StorageService {
     const endpoint = this.config.getOrThrow('MINIO_ENDPOINT');
     // Presigned URLs must target an address reachable by mobile clients, not the
     // internal Docker hostname (e.g. minio:9000). Signing is local — no S3 RPC.
-    this.publicEndpoint =
+    const publicEndpoint =
       this.config.get('MINIO_PUBLIC_ENDPOINT') ?? endpoint;
+    const forcePathStyle =
+      this.config.get('MINIO_FORCE_PATH_STYLE', 'true') !== 'false';
+    this.physicalBucketName = this.config.get('MINIO_BUCKET_NAME');
     this.client = new S3Client({
-      endpoint: this.publicEndpoint,
+      endpoint: publicEndpoint,
       region: this.config.get('MINIO_REGION', 'us-east-1'),
       credentials: {
         accessKeyId: this.config.getOrThrow('MINIO_ACCESS_KEY'),
         secretAccessKey: this.config.getOrThrow('MINIO_SECRET_KEY'),
       },
-      forcePathStyle: true,
+      forcePathStyle,
     });
   }
 
@@ -78,9 +82,14 @@ export class StorageService {
     }
     await this.assertAccess(safeBucket, key, user, 'write');
     const contentType = this.resolveContentType(safeBucket, key);
+    const { bucket: s3Bucket, key: s3Key } = resolveS3Location(
+      safeBucket,
+      key,
+      this.physicalBucketName,
+    );
     const command = new PutObjectCommand({
-      Bucket: safeBucket,
-      Key: key,
+      Bucket: s3Bucket,
+      Key: s3Key,
       ContentType: contentType,
     });
     const url = await getSignedUrl(this.client, command, { expiresIn: 3600 });
@@ -91,7 +100,12 @@ export class StorageService {
     const safeBucket = this.validateBucket(bucket);
     this.validateKey(key);
     await this.assertAccess(safeBucket, key, user, 'read');
-    const command = new GetObjectCommand({ Bucket: safeBucket, Key: key });
+    const { bucket: s3Bucket, key: s3Key } = resolveS3Location(
+      safeBucket,
+      key,
+      this.physicalBucketName,
+    );
+    const command = new GetObjectCommand({ Bucket: s3Bucket, Key: s3Key });
     const url = await getSignedUrl(this.client, command, { expiresIn: 3600 });
     return { url, bucket: safeBucket, key };
   }
