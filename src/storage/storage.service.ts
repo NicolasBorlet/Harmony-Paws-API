@@ -168,6 +168,19 @@ export class StorageService {
 
     if (bucket === 'dogs') {
       const dogId = key.replace(/\.(jpeg|jpg|png|webp)$/, '');
+      if (!this.isUuid(dogId)) {
+        throw new BadRequestException('Invalid object key');
+      }
+      // Dog profiles are exposed across users via discovery, so any
+      // authenticated user may read a dog image; only the owner may upload.
+      if (operation === 'read') {
+        const dog = await this.prisma.dog.findUnique({
+          where: { id: dogId },
+          select: { id: true },
+        });
+        if (!dog) throw new ForbiddenException('Cannot access this dog image');
+        return;
+      }
       await this.assertDogOwner(dogId, user.id, 'Cannot access this dog image');
       return;
     }
