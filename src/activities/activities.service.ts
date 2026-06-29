@@ -398,6 +398,25 @@ export class ActivitiesService {
     });
   }
 
+  async getStats(activityId: string, userId: string) {
+    await this.assertParticipant(activityId, userId);
+
+    const stats = await this.prisma.activityStats.findUnique({
+      where: { activityId_userId: { activityId, userId } },
+    });
+    if (!stats) {
+      throw new NotFoundException('Activity stats not found');
+    }
+
+    return serialize({
+      ...stats,
+      distanceKm: decimalToNumber(stats.distanceKm),
+      averageSpeedKmh: decimalToNumber(stats.averageSpeedKmh),
+      maxSpeedKmh: decimalToNumber(stats.maxSpeedKmh),
+      temperatureCelsius: decimalToNumber(stats.temperatureCelsius),
+    });
+  }
+
   async listInvitations(userId: string) {
     const invitations = await this.prisma.activityInvitation.findMany({
       where: { receiverId: userId },

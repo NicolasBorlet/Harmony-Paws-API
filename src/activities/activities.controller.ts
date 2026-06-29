@@ -206,6 +206,19 @@ export class ActivitiesController {
     });
   }
 
+  @Get(':id/stats')
+  @ApiOperation({
+    summary: 'Statistiques de la balade pour le participant connecté',
+    description:
+      'Retourne les statistiques enregistrées (distance, durée, trace GPS) pour cette activité.',
+  })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
+  @ApiOkResponse({ type: ActivityStatsResponseDto })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  getStats(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.activitiesService.getStats(id, user.id);
+  }
+
   @Post(':id/stats')
   @ApiOperation({
     summary: 'Enregistrer les statistiques GPS',

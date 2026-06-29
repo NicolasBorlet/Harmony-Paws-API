@@ -156,11 +156,29 @@ export class ActivityStatsResponseDto {
   @ApiPropertyOptional({ example: 90 })
   duration_minutes?: number;
 
+  @ApiPropertyOptional({ example: '2026-06-20T09:05:00.000Z' })
+  actual_start_time?: string | null;
+
+  @ApiPropertyOptional({ example: '2026-06-20T10:35:00.000Z' })
+  actual_end_time?: string | null;
+
+  @ApiPropertyOptional({ example: 4.5 })
+  average_speed_kmh?: number | null;
+
+  @ApiPropertyOptional({ example: 12.3 })
+  max_speed_kmh?: number | null;
+
+  @ApiPropertyOptional({ example: 8500 })
+  steps_count?: number | null;
+
+  @ApiPropertyOptional({ example: 320 })
+  calories_burned?: number | null;
+
   @ApiPropertyOptional({ example: true })
   is_completed?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Points GPS [{ lat, lng, timestamp }, …]',
+    description: 'Points GPS [{ lat, lng, timestamp }, …] ou [lng, lat]',
     example: [{ lat: 48.832, lng: 2.432, timestamp: '2026-06-20T09:10:00.000Z' }],
   })
   route_points?: unknown;

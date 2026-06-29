@@ -327,3 +327,76 @@ describe('ActivitiesService — saveStats premium GPS gating', () => {
     );
   });
 });
+
+describe('ActivitiesService — getStats', () => {
+  let service: ActivitiesService;
+  let prisma: Record<string, jest.Mock>;
+
+  const activityId = 'activity-uuid';
+  const userId = 'user-uuid';
+
+  beforeEach(async () => {
+    prisma = {
+      activity: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: activityId,
+          creatorId: userId,
+          userActivities: [],
+        }),
+      },
+      activityStats: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'stats-uuid',
+          activityId,
+          userId,
+          distanceKm: { toNumber: () => 5.2 },
+          durationMinutes: 90,
+          stepsCount: 8500,
+          routePoints: [[2.432, 48.832]],
+          averageSpeedKmh: null,
+          maxSpeedKmh: null,
+          temperatureCelsius: null,
+          isCompleted: true,
+        }),
+      },
+    };
+
+    const module = await Test.createTestingModule({
+      providers: [
+        ActivitiesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: EventsGateway, useValue: { emitToActivity: jest.fn(), emitToUser: jest.fn() } },
+        { provide: BadgeEngineService, useValue: { evaluateAndAward: jest.fn() } },
+        { provide: RewardService, useValue: { awardReward: jest.fn() } },
+        { provide: PremiumService, useValue: { isPremium: jest.fn() } },
+        { provide: DogStatsService, useValue: { syncFromActivityStats: jest.fn() } },
+      ],
+    }).compile();
+
+    service = module.get(ActivitiesService);
+  });
+
+  it('returns serialized stats for a participant', async () => {
+    const result = await service.getStats(activityId, userId);
+
+    expect(prisma.activityStats.findUnique).toHaveBeenCalledWith({
+      where: { activityId_userId: { activityId, userId } },
+    });
+    expect(result).toMatchObject({
+      id: 'stats-uuid',
+      activityId,
+      userId,
+      durationMinutes: 90,
+      stepsCount: 8500,
+      isCompleted: true,
+    });
+  });
+
+  it('throws NotFoundException when stats are missing', async () => {
+    prisma.activityStats.findUnique.mockResolvedValue(null);
+
+    await expect(service.getStats(activityId, userId)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});
