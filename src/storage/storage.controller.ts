@@ -21,6 +21,10 @@ import { StorageService } from './storage.service';
 const BUCKET_DESCRIPTION =
   'Bucket MinIO : users | dogs | rides | formations | modules | documents | user-badges';
 
+/** Strip a trailing image extension when a shortcut route captures `{id}.jpeg`. */
+const stripImageExtension = (id: string): string =>
+  id.replace(/\.(jpeg|jpg|png|webp)$/i, '');
+
 @ApiTags('storage')
 @Controller('storage')
 @UseGuards(JwtAuthGuard)
@@ -45,7 +49,8 @@ export class StorageController {
     @Param('dogId') dogId: string,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.storage.getUploadUrl('dogs', `${dogId}.jpeg`, user);
+    const id = stripImageExtension(dogId);
+    return this.storage.getUploadUrl('dogs', `${id}.jpeg`, user);
   }
 
   @Post('rides/:rideId/upload-url')
@@ -65,7 +70,8 @@ export class StorageController {
     @Param('rideId') rideId: string,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.storage.getUploadUrl('rides', `${rideId}.jpeg`, user);
+    const id = stripImageExtension(rideId);
+    return this.storage.getUploadUrl('rides', `${id}.jpeg`, user);
   }
 
   @Get(':bucket/:key/url')
