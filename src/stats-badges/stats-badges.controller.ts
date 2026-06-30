@@ -7,6 +7,7 @@ import {
 } from '../common/decorators/current-user.decorator';
 import { StatsBadgesService } from './stats-badges.service';
 import { BadgeEngineService } from './badge-engine.service';
+import { PremiumService } from '../billing/premium.service';
 import {
   ApiJwtAuth,
   ApiStandardResponses,
@@ -25,6 +26,7 @@ export class StatsBadgesController {
   constructor(
     private readonly statsBadgesService: StatsBadgesService,
     private readonly badgeEngine: BadgeEngineService,
+    private readonly premiumService: PremiumService,
   ) {}
 
   @Get('me')
@@ -32,15 +34,17 @@ export class StatsBadgesController {
   @ApiJwtAuth()
   @ApiOperation({
     summary: 'Mes statistiques agrégées',
-    description: 'Distance totale, streaks, activités mensuelles, etc.',
+    description:
+      'Distance totale, streaks, etc. Les stats précises (mensuelles et moyennes) sont réservées aux utilisateurs premium ; elles sont renvoyées à null avec un flag `locked` pour les non-premium.',
   })
   @ApiOkResponse({
     description: 'Statistiques utilisateur (null si jamais initialisées)',
     type: UserStatsResponseDto,
   })
   @ApiStandardResponses({ unauthorized: true })
-  myStats(@CurrentUser() user: AuthUser) {
-    return this.statsBadgesService.getUserStats(user.id);
+  async myStats(@CurrentUser() user: AuthUser) {
+    const isPremium = await this.premiumService.isPremium(user.id);
+    return this.statsBadgesService.getUserStats(user.id, isPremium);
   }
 
   @Get('badges/me')

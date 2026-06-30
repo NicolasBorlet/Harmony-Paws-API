@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { PremiumGuard } from '../common/guards/premium.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
 import { SocialService } from './social.service';
@@ -126,12 +127,14 @@ export class SocialController {
   }
 
   @Get('meetings')
+  @UseGuards(PremiumGuard)
   @ApiOperation({
     summary: 'Historique des rencontres',
-    description: 'Utilisateurs rencontrés lors de balades passées.',
+    description:
+      'Réservé aux utilisateurs premium. Utilisateurs rencontrés lors de balades passées.',
   })
   @ApiOkResponse({ type: [UserMeetingResponseDto] })
-  @ApiStandardResponses({ unauthorized: true })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true })
   listMeetings(@CurrentUser() user: AuthUser) {
     return this.socialService.listMeetings(user.id);
   }

@@ -25,6 +25,7 @@ import {
   CurrentUser,
 } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { PremiumGuard } from '../common/guards/premium.guard';
 import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
 import {
   ApiJwtAuth,
@@ -207,10 +208,11 @@ export class ActivitiesController {
   }
 
   @Get(':id/stats')
+  @UseGuards(PremiumGuard)
   @ApiOperation({
     summary: 'Statistiques de la balade pour le participant connecté',
     description:
-      'Retourne les statistiques enregistrées (distance, durée, trace GPS) pour cette activité.',
+      'Réservé aux utilisateurs premium. Retourne les statistiques enregistrées (distance, durée, trace GPS) pour cette activité.',
   })
   @ApiParam({ name: 'id', description: "UUID de l'activité" })
   @ApiOkResponse({ type: ActivityStatsResponseDto })
