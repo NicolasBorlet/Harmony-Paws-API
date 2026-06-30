@@ -62,11 +62,40 @@ export class UserStatsResponseDto {
   @ApiPropertyOptional({ example: 12 })
   longest_streak?: number;
 
-  @ApiPropertyOptional({ example: 22.3 })
-  monthly_distance_km?: number;
+  @ApiPropertyOptional({
+    example: 22.3,
+    description: 'Réservé au premium (null sinon).',
+    nullable: true,
+  })
+  monthly_distance_km?: number | null;
 
-  @ApiPropertyOptional({ example: 8 })
-  monthly_activities?: number;
+  @ApiPropertyOptional({
+    example: 8,
+    description: 'Réservé au premium (null sinon).',
+    nullable: true,
+  })
+  monthly_activities?: number | null;
+
+  @ApiPropertyOptional({
+    example: 2.6,
+    description: 'Distance moyenne par activité (km). Réservé au premium (null sinon).',
+    nullable: true,
+  })
+  avg_distance_per_activity_km?: number | null;
+
+  @ApiPropertyOptional({
+    example: 75,
+    description: 'Durée moyenne par activité (minutes). Réservé au premium (null sinon).',
+    nullable: true,
+  })
+  avg_duration_per_activity_minutes?: number | null;
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'true si l’utilisateur n’est pas premium : les stats précises (mensuelles et moyennes) sont alors à null.',
+  })
+  locked?: boolean;
 
   @ApiPropertyOptional({ example: 120, description: 'Total os (bones)' })
   total_points?: number;

@@ -4,8 +4,10 @@ import { StatsBadgesService } from './stats-badges.service';
 import { BadgeEngineService } from './badge-engine.service';
 import { DogStatsService } from './dog-stats.service';
 import { RewardService } from './reward.service';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
+  imports: [BillingModule],
   controllers: [StatsBadgesController],
   providers: [StatsBadgesService, BadgeEngineService, RewardService, DogStatsService],
   exports: [BadgeEngineService, RewardService, DogStatsService],

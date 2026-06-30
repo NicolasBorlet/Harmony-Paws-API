@@ -6,15 +6,35 @@ import { serialize, decimalToNumber } from '../common/utils/serialize';
 export class StatsBadgesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getUserStats(userId: string) {
+  async getUserStats(userId: string, isPremium: boolean) {
     const stats = await this.prisma.userStats.findUnique({
       where: { userId },
     });
     if (!stats) return null;
+
+    const totalDistanceKm = decimalToNumber(stats.totalDistanceKm) ?? 0;
+    const totalActivities = stats.totalActivities ?? 0;
+    const totalDurationMinutes = stats.totalDurationMinutes ?? 0;
+
+    // Métriques moyennes dérivées des totaux (réservées au premium).
+    const avgDistancePerActivityKm =
+      totalActivities > 0 ? totalDistanceKm / totalActivities : 0;
+    const avgDurationPerActivityMinutes =
+      totalActivities > 0 ? totalDurationMinutes / totalActivities : 0;
+
     return serialize({
       ...stats,
-      totalDistanceKm: decimalToNumber(stats.totalDistanceKm),
-      monthlyDistanceKm: decimalToNumber(stats.monthlyDistanceKm),
+      totalDistanceKm,
+      // Stats précises réservées aux utilisateurs premium.
+      locked: !isPremium,
+      monthlyDistanceKm: isPremium
+        ? decimalToNumber(stats.monthlyDistanceKm)
+        : null,
+      monthlyActivities: isPremium ? stats.monthlyActivities : null,
+      avgDistancePerActivityKm: isPremium ? avgDistancePerActivityKm : null,
+      avgDurationPerActivityMinutes: isPremium
+        ? avgDurationPerActivityMinutes
+        : null,
     });
   }
 
