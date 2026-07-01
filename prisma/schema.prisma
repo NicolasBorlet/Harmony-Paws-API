@@ -17,6 +17,7 @@ enum ActivityStatus {
   in_progress
   paused
   finished
+  archived
 }
 
 enum ActivityType {

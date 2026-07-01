@@ -66,6 +66,23 @@ const ACTIVITY_DETAIL_INCLUDE = {
   stats: true,
 };
 
+const ARCHIVABLE_STATUSES: ActivityStatus[] = [
+  ActivityStatus.not_started,
+  ActivityStatus.ready_to_start,
+  ActivityStatus.paused,
+];
+
+function startOfCalendarDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function isActivityDayPassed(
+  activityDate: Date,
+  reference: Date = new Date(),
+): boolean {
+  return startOfCalendarDay(reference) > startOfCalendarDay(activityDate);
+}
+
 @Injectable()
 export class ActivitiesService {
   private readonly logger = new Logger(ActivitiesService.name);
@@ -80,6 +97,8 @@ export class ActivitiesService {
   ) {}
 
   async listForUser(userId: string) {
+    await this.archivePastActivities({ userId });
+
     const activities = await this.prisma.activity.findMany({
       where: {
         OR: [{ creatorId: userId }, { userActivities: { some: { userId } } }],
@@ -99,6 +118,8 @@ export class ActivitiesService {
   }
 
   async getById(activityId: string, userId: string) {
+    await this.archivePastActivities({ activityId });
+
     const activity = await this.prisma.activity.findUnique({
       where: { id: activityId },
       include: ACTIVITY_DETAIL_INCLUDE,
@@ -279,6 +300,31 @@ export class ActivitiesService {
     },
   ) {
     await this.assertParticipant(activityId, userId);
+    await this.archivePastActivities({ activityId });
+
+    const existing = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { status: true, date: true },
+    });
+    if (!existing) throw new NotFoundException('Activity not found');
+
+    if (existing.status === ActivityStatus.archived) {
+      throw new BadRequestException(
+        'Activity is archived and can no longer be started',
+      );
+    }
+
+    if (
+      status === ActivityStatus.in_progress &&
+      isActivityDayPassed(existing.date)
+    ) {
+      await this.prisma.activity.update({
+        where: { id: activityId },
+        data: { status: ActivityStatus.archived },
+      });
+      throw new BadRequestException('Activity date has passed');
+    }
+
     const activity = await this.prisma.activity.update({
       where: { id: activityId },
       data: {
@@ -613,7 +659,8 @@ export class ActivitiesService {
 
     if (
       activity.status === ActivityStatus.in_progress ||
-      activity.status === ActivityStatus.finished
+      activity.status === ActivityStatus.finished ||
+      activity.status === ActivityStatus.archived
     ) {
       throw new BadRequestException(
         'Cannot update dogs after the activity has started',
@@ -814,6 +861,30 @@ export class ActivitiesService {
     if (participantIds.size >= activity.participantLimit) {
       throw new ConflictException('Participant limit reached');
     }
+  }
+
+  private async archivePastActivities(scope?: {
+    userId?: string;
+    activityId?: string;
+  }) {
+    const startOfToday = startOfCalendarDay(new Date());
+
+    await this.prisma.activity.updateMany({
+      where: {
+        status: { in: ARCHIVABLE_STATUSES },
+        date: { lt: startOfToday },
+        ...(scope?.activityId ? { id: scope.activityId } : {}),
+        ...(scope?.userId
+          ? {
+              OR: [
+                { creatorId: scope.userId },
+                { userActivities: { some: { userId: scope.userId } } },
+              ],
+            }
+          : {}),
+      },
+      data: { status: ActivityStatus.archived },
+    });
   }
 
   private async assertParticipant(activityId: string, userId: string) {
