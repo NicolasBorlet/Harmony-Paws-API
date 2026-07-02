@@ -19,6 +19,7 @@ import { WebsocketModule } from './websocket/websocket.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SystemModule } from './system/system.module';
 import { AdminModule } from './admin/admin.module';
+import { DogFriendlyPlacesModule } from './dog-friendly-places/dog-friendly-places.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { AdminModule } from './admin/admin.module';
     NotificationsModule,
     BillingModule,
     AdminModule,
+    DogFriendlyPlacesModule,
   ],
   providers: [
     {

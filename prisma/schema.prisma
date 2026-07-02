@@ -81,6 +81,30 @@ enum RewardSource {
   activity
 }
 
+enum DogFriendlyCategory {
+  dog_park
+  beach
+  drinking_water
+  dog_agility
+  nature_reserve
+  animal_training
+  animal_shelter
+  guest_house
+  other
+}
+
+enum DogPolicy {
+  yes
+  leashed
+  unleashed
+  designated
+}
+
+enum DogFriendlyPlaceStatus {
+  need_review
+  active
+}
+
 // ---------------------------------------------------------------------------
 // Users & auth
 // ---------------------------------------------------------------------------
@@ -141,7 +165,8 @@ model User {
   formationFavorites      FormationFavorite[]
   activityLivePushTokens  ActivityLivePushToken[]
   activityDogs            ActivityDog[]
-  activityDogStats        ActivityDogStats[]
+  activityDogStats      ActivityDogStats[]
+  createdDogFriendlyPlaces DogFriendlyPlace[] @relation("DogFriendlyPlaceCreator")
 
   @@map("users")
 }
@@ -873,4 +898,46 @@ model UserBadge {
 
   @@unique([userId, badgeId])
   @@map("user_badges")
+}
+
+// ---------------------------------------------------------------------------
+// Dog-friendly places (OSM import)
+// ---------------------------------------------------------------------------
+
+model DogFriendlyPlace {
+  id           String                   @id @default(uuid()) @db.Uuid
+  osmType      String                   @map("osm_type") @db.VarChar(10)
+  osmId        BigInt                   @map("osm_id")
+  latitude     Float
+  longitude    Float
+  geohash      String                   @db.VarChar(12)
+  category     DogFriendlyCategory
+  status       DogFriendlyPlaceStatus   @default(active)
+  name         String?
+  dogPolicy    DogPolicy?               @map("dog_policy")
+  wheelchair   String?                  @db.VarChar(20)
+  access       String?                  @db.VarChar(20)
+  city         String?                  @db.VarChar(100)
+  postcode     String?                  @db.VarChar(10)
+  street       String?                  @db.VarChar(200)
+  phone        String?                  @db.VarChar(30)
+  email        String?                  @db.VarChar(200)
+  website      String?                  @db.VarChar(500)
+  openingHours String?                  @map("opening_hours") @db.VarChar(200)
+  description  String?
+  tags         Json                     @default("{}")
+  source       String?                  @db.VarChar(200)
+  surveyDate   DateTime?                @map("survey_date") @db.Date
+  createdById  String?                  @map("created_by_id") @db.Uuid
+  createdAt    DateTime                 @default(now()) @map("created_at")
+  updatedAt    DateTime                 @updatedAt @map("updated_at")
+
+  createdBy User? @relation("DogFriendlyPlaceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([osmType, osmId])
+  @@index([geohash])
+  @@index([category])
+  @@index([status])
+  @@index([latitude, longitude])
+  @@map("dog_friendly_places")
 }

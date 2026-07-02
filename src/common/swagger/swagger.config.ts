@@ -80,6 +80,10 @@ export const SWAGGER_TAGS = [
     name: 'storage',
     description: 'URLs présignées MinIO/S3 pour upload et téléchargement',
   },
+  {
+    name: 'dog-friendly-places',
+    description: 'Lieux dog-friendly (carte, soumissions utilisateur, modération admin)',
+  },
 ] as const;
 
 export function setupSwagger(app: INestApplication): void {
