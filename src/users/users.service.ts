@@ -4,6 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { serialize } from '../common/utils/serialize';
 import { UpdateProfileDto } from './dto/users.dto';
 
+function normalizeLocale(locale: string): 'fr' | 'en' {
+  return locale.toLowerCase().startsWith('en') ? 'en' : 'fr';
+}
+
 const PREFERENCE_FIELDS = [
   'pushNotifications',
   'emailNotifications',
@@ -68,10 +72,37 @@ export class UsersService {
       publicProfile: _publicProfile,
       shareLocation: _shareLocation,
       analytics: _analytics,
+      locale: _locale,
       ...profileData
     } = data;
 
     return profileData;
+  }
+
+  private buildPreferencesUpsert(data: UpdateProfileDto) {
+    const preferenceUpdates = this.extractPreferenceUpdates(data);
+    const locale =
+      data.locale !== undefined ? normalizeLocale(data.locale) : undefined;
+    const hasPreferenceUpdates =
+      Object.keys(preferenceUpdates).length > 0 || locale !== undefined;
+
+    if (!hasPreferenceUpdates) {
+      return undefined;
+    }
+
+    return {
+      upsert: {
+        create: {
+          ...DEFAULT_PREFERENCES,
+          locale: locale ?? 'fr',
+          ...preferenceUpdates,
+        },
+        update: {
+          ...preferenceUpdates,
+          ...(locale !== undefined ? { locale } : {}),
+        },
+      },
+    };
   }
 
   async getMe(userId: string) {
@@ -134,24 +165,13 @@ export class UsersService {
 
   async updateProfile(userId: string, data: UpdateProfileDto) {
     const profileData = this.extractProfileData(data);
-    const preferenceUpdates = this.extractPreferenceUpdates(data);
-    const hasPreferenceUpdates = Object.keys(preferenceUpdates).length > 0;
+    const userPreferences = this.buildPreferencesUpsert(data);
 
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
         ...profileData,
-        ...(hasPreferenceUpdates && {
-          userPreferences: {
-            upsert: {
-              create: {
-                ...DEFAULT_PREFERENCES,
-                ...preferenceUpdates,
-              },
-              update: preferenceUpdates,
-            },
-          },
-        }),
+        ...(userPreferences && { userPreferences }),
       },
       include: this.meInclude,
     });

@@ -4,6 +4,14 @@ import { UserPreferences } from '@prisma/client';
 import { Expo, ExpoPushMessage } from 'expo-server-sdk';
 import { PrismaService } from '../prisma/prisma.service';
 
+import {
+  invitationAcceptedCopy,
+  messageNotificationCopy,
+  participantJoinedCopy,
+  resolveNotificationLocale,
+  rideInvitationCopy,
+} from './notifications.i18n';
+
 type PushData = Record<string, string>;
 
 @Injectable()
@@ -36,13 +44,18 @@ export class NotificationsService {
       return;
     }
 
-    const title = sender?.firstName
-      ? `${sender.firstName} sent you a message`
-      : 'New message';
+    const locale = resolveNotificationLocale(
+      recipient!.userPreferences?.locale,
+    );
+    const { title, body } = messageNotificationCopy(
+      locale,
+      sender?.firstName,
+      content,
+    );
 
     await this.deliverPush(recipient!.expoPushToken!, {
       title,
-      body: content.slice(0, 100),
+      body,
       data: { type: 'message', senderId },
       sound: 'default',
     });
@@ -66,10 +79,14 @@ export class NotificationsService {
       return;
     }
 
-    const senderName = sender?.firstName ?? 'Someone';
+    const locale = resolveNotificationLocale(
+      recipient!.userPreferences?.locale,
+    );
+    const { title, body } = rideInvitationCopy(locale, sender?.firstName);
+
     await this.deliverPush(recipient!.expoPushToken!, {
-      title: 'New walk invitation',
-      body: `${senderName} invited you to join a walk`,
+      title,
+      body,
       data: {
         type: 'ride_invitation',
         senderId,
@@ -98,10 +115,14 @@ export class NotificationsService {
       return;
     }
 
-    const joinerName = joiner?.firstName ?? 'Someone';
+    const locale = resolveNotificationLocale(
+      recipient!.userPreferences?.locale,
+    );
+    const { title, body } = invitationAcceptedCopy(locale, joiner?.firstName);
+
     await this.deliverPush(recipient!.expoPushToken!, {
-      title: 'Invitation accepted',
-      body: `${joinerName} accepted your walk invitation`,
+      title,
+      body,
       data: {
         type: 'invitation_accepted',
         joinerId,
@@ -129,10 +150,14 @@ export class NotificationsService {
       return;
     }
 
-    const joinerName = joiner?.firstName ?? 'Someone';
+    const locale = resolveNotificationLocale(
+      recipient!.userPreferences?.locale,
+    );
+    const { title, body } = participantJoinedCopy(locale, joiner?.firstName);
+
     await this.deliverPush(recipient!.expoPushToken!, {
-      title: 'New participant',
-      body: `${joinerName} joined your walk`,
+      title,
+      body,
       data: {
         type: 'participant_joined',
         joinerId,

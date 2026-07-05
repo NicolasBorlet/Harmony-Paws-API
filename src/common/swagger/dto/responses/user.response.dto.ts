@@ -45,6 +45,9 @@ export class UserPreferencesEmbeddedDto {
   @ApiProperty({ example: true })
   analytics: boolean;
 
+  @ApiProperty({ example: 'fr', enum: ['fr', 'en'] })
+  locale: string;
+
   @ApiProperty({ example: '2026-01-15T08:00:00.000Z' })
   created_at: string;
 

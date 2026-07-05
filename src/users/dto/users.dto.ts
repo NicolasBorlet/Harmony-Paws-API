@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -138,4 +139,14 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   analytics?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'fr',
+    description: 'Langue de l’application pour les notifications push',
+    enum: ['fr', 'en'],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['fr', 'en'])
+  locale?: string;
 }

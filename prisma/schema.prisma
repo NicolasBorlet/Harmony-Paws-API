@@ -784,6 +784,7 @@ model UserPreferences {
   publicProfile        Boolean  @default(true) @map("public_profile")
   shareLocation        Boolean  @default(true) @map("share_location")
   analytics            Boolean  @default(true)
+  locale               String   @default("fr") @db.VarChar(5)
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
