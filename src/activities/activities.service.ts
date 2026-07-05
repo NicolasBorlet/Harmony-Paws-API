@@ -15,8 +15,9 @@ import {
   Prisma,
   RewardSource,
 } from '@prisma/client';
-import { decimalToNumber, serialize } from '../common/utils/serialize';
 import { PremiumService } from '../billing/premium.service';
+import { decimalToNumber, serialize } from '../common/utils/serialize';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BadgeEngineService } from '../stats-badges/badge-engine.service';
 import { DogStatsService } from '../stats-badges/dog-stats.service';
@@ -94,6 +95,7 @@ export class ActivitiesService {
     private readonly rewardService: RewardService,
     private readonly premiumService: PremiumService,
     private readonly dogStatsService: DogStatsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async listForUser(userId: string) {
@@ -114,7 +116,9 @@ export class ActivitiesService {
       },
       orderBy: { date: 'desc' },
     });
-    return serialize(activities.map((activity) => this.mapActivityDogs(activity)));
+    return serialize(
+      activities.map((activity) => this.mapActivityDogs(activity)),
+    );
   }
 
   async getById(activityId: string, userId: string) {
@@ -342,7 +346,11 @@ export class ActivitiesService {
     );
     notifiedUserIds.add(activity.creatorId);
     for (const notifiedUserId of notifiedUserIds) {
-      this.events.emitToUser(notifiedUserId, WS_EVENTS.ACTIVITY_BANNER, activity);
+      this.events.emitToUser(
+        notifiedUserId,
+        WS_EVENTS.ACTIVITY_BANNER,
+        activity,
+      );
     }
     return serialize(activity);
   }
@@ -522,6 +530,12 @@ export class ActivitiesService {
       WS_EVENTS.INVITATION_CHANGED,
       invitation,
     );
+    void this.notifications.sendRideInvitationNotification(
+      receiverId,
+      senderId,
+      activityId,
+      invitation.id.toString(),
+    );
     return serialize(invitation);
   }
 
@@ -557,20 +571,14 @@ export class ActivitiesService {
         create: { userId, activityId: invitation.activityId },
         update: {},
       });
-      await this.linkDogsToActivity(
-        tx,
-        invitation.activityId,
-        userId,
-        dogIds,
-      );
+      await this.linkDogsToActivity(tx, invitation.activityId, userId, dogIds);
       return this.getActivityDogsForUser(tx, invitation.activityId, userId);
     });
 
-    this.events.emitToUser(
-      invitation.senderId,
-      WS_EVENTS.INVITATION_CHANGED,
-      { id: invitationId.toString(), status: ActivityInvitationStatus.accepted },
-    );
+    this.events.emitToUser(invitation.senderId, WS_EVENTS.INVITATION_CHANGED, {
+      id: invitationId.toString(),
+      status: ActivityInvitationStatus.accepted,
+    });
     this.events.emitToUser(userId, WS_EVENTS.INVITATION_CHANGED, {
       id: invitationId.toString(),
       status: ActivityInvitationStatus.accepted,
@@ -583,6 +591,12 @@ export class ActivitiesService {
         activityId: invitation.activityId,
         dogs: joinedDogs,
       },
+    );
+    void this.notifications.sendInvitationAcceptedNotification(
+      invitation.senderId,
+      userId,
+      invitation.activityId,
+      invitationId.toString(),
     );
     return serialize({
       id: invitationId.toString(),
@@ -598,7 +612,9 @@ export class ActivitiesService {
     if (!activity) throw new NotFoundException('Activity not found');
 
     if (activity.visibility !== ActivityVisibility.public) {
-      throw new ForbiddenException('Only public activities can be joined directly');
+      throw new ForbiddenException(
+        'Only public activities can be joined directly',
+      );
     }
 
     if (
@@ -635,6 +651,14 @@ export class ActivitiesService {
       activityId,
       dogs: joinedDogs,
     });
+
+    if (activity.creatorId !== userId) {
+      void this.notifications.sendParticipantJoinedNotification(
+        activity.creatorId,
+        userId,
+        activityId,
+      );
+    }
 
     const fullActivity = await this.prisma.activity.findUnique({
       where: { id: activityId },

@@ -9,6 +9,16 @@ import {
   ActivityStatus,
   ActivityVisibility,
 } from '@prisma/client';
+
+jest.mock('../notifications/notifications.service', () => ({
+  NotificationsService: jest.fn().mockImplementation(() => ({
+    sendRideInvitationNotification: jest.fn(),
+    sendInvitationAcceptedNotification: jest.fn(),
+    sendParticipantJoinedNotification: jest.fn(),
+    sendMessageNotification: jest.fn(),
+  })),
+}));
+
 import { ActivitiesService } from './activities.service';
 import { PremiumService } from '../billing/premium.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +26,7 @@ import { EventsGateway } from '../websocket/events.gateway';
 import { BadgeEngineService } from '../stats-badges/badge-engine.service';
 import { DogStatsService } from '../stats-badges/dog-stats.service';
 import { RewardService } from '../stats-badges/reward.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('ActivitiesService — activity dogs', () => {
   let service: ActivitiesService;
@@ -73,6 +84,7 @@ describe('ActivitiesService — activity dogs', () => {
         { provide: RewardService, useValue: { awardReward: jest.fn() } },
         { provide: PremiumService, useValue: { isPremium: jest.fn().mockResolvedValue(false) } },
         { provide: DogStatsService, useValue: { syncFromActivityStats: jest.fn() } },
+        { provide: NotificationsService, useValue: new NotificationsService() },
       ],
     }).compile();
 
@@ -279,6 +291,7 @@ describe('ActivitiesService — saveStats premium GPS gating', () => {
         { provide: RewardService, useValue: { awardReward: jest.fn() } },
         { provide: PremiumService, useValue: premiumService },
         { provide: DogStatsService, useValue: dogStatsService },
+        { provide: NotificationsService, useValue: new NotificationsService() },
       ],
     }).compile();
 
@@ -370,6 +383,7 @@ describe('ActivitiesService — getStats', () => {
         { provide: RewardService, useValue: { awardReward: jest.fn() } },
         { provide: PremiumService, useValue: { isPremium: jest.fn() } },
         { provide: DogStatsService, useValue: { syncFromActivityStats: jest.fn() } },
+        { provide: NotificationsService, useValue: new NotificationsService() },
       ],
     }).compile();
 
