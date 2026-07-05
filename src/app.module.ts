@@ -20,6 +20,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SystemModule } from './system/system.module';
 import { AdminModule } from './admin/admin.module';
 import { DogFriendlyPlacesModule } from './dog-friendly-places/dog-friendly-places.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { DogFriendlyPlacesModule } from './dog-friendly-places/dog-friendly-plac
     BillingModule,
     AdminModule,
     DogFriendlyPlacesModule,
+    EmailModule,
   ],
   providers: [
     {

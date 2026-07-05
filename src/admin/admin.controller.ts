@@ -27,6 +27,11 @@ import {
 } from '../common/swagger/decorators/api-common.decorator';
 import { AdminService } from './admin.service';
 import {
+  AdminBroadcastEmailDto,
+  AdminBroadcastResponseDto,
+} from '../email/dto/email.dto';
+import { EmailService } from '../email/email.service';
+import {
   AdminCreateRowDto,
   AdminPaginatedResponseDto,
   AdminStatsResponseDto,
@@ -39,7 +44,22 @@ import {
 @Roles('admin')
 @ApiJwtAuth()
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly emailService: EmailService,
+  ) {}
+
+  @Post('emails/broadcast')
+  @ApiOperation({
+    summary: 'Envoi email en batch (admin)',
+    description:
+      'Diffuse un email personnalisé (sujet + HTML fournis par l\'admin) aux utilisateurs avec notifications email activées. Types : `app_update`, `promo`, `custom`.',
+  })
+  @ApiCreatedResponse({ type: AdminBroadcastResponseDto })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true })
+  sendBroadcast(@Body() body: AdminBroadcastEmailDto) {
+    return this.emailService.sendAdminBroadcast(body);
+  }
 
   @Get('stats')
   @ApiOperation({
