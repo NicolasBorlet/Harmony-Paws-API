@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UserPreferences } from '@prisma/client';
 import { Expo, ExpoPushMessage } from 'expo-server-sdk';
@@ -11,6 +11,7 @@ import {
   resolveNotificationLocale,
   rideInvitationCopy,
 } from './notifications.i18n';
+import { AdminBroadcastNotificationDto } from './dto/notifications.dto';
 
 type PushData = Record<string, string>;
 
@@ -165,6 +166,104 @@ export class NotificationsService {
       },
       sound: 'default',
     });
+  }
+
+  async sendAdminBroadcast(dto: AdminBroadcastNotificationDto) {
+    const recipients = await this.resolveBroadcastRecipients(dto.userIds);
+
+    if (recipients.length === 0) {
+      throw new BadRequestException(
+        'Aucun destinataire éligible (notifications push désactivées ou liste vide)',
+      );
+    }
+
+    const messages: ExpoPushMessage[] = recipients.map((recipient) => ({
+      to: recipient.expoPushToken!,
+      title: dto.title,
+      body: dto.body,
+      sound: 'default',
+      data: {
+        type: 'admin_broadcast',
+        campaignType: dto.campaignType,
+        campaignId: dto.campaignId,
+        ...dto.data,
+      },
+    }));
+
+    const ticketCount = await this.deliverPushBatch(messages);
+
+    this.logger.log(
+      `Admin push broadcast "${dto.campaignType}/${dto.campaignId}" sent to ${recipients.length} recipients (${ticketCount} tickets)`,
+    );
+
+    return {
+      sentCount: recipients.length,
+      ticketCount,
+    };
+  }
+
+  private async resolveBroadcastRecipients(userIds?: string[]) {
+    const users = await this.prisma.user.findMany({
+      where: {
+        ...(userIds?.length ? { id: { in: userIds } } : {}),
+        expoPushToken: { not: null },
+        userPreferences: {
+          is: {
+            pushNotifications: true,
+          },
+        },
+      },
+      select: { id: true, expoPushToken: true },
+    });
+
+    const eligible = users.filter(
+      (user) =>
+        user.expoPushToken && Expo.isExpoPushToken(user.expoPushToken),
+    );
+
+    if (userIds?.length) {
+      const foundIds = new Set(eligible.map((user) => user.id));
+      const missing = userIds.filter((id) => !foundIds.has(id));
+      if (missing.length > 0) {
+        this.logger.warn(
+          `Push broadcast skipped ${missing.length} users (not found, no token, or push opt-out)`,
+        );
+      }
+    }
+
+    return eligible;
+  }
+
+  private async deliverPushBatch(messages: ExpoPushMessage[]) {
+    const chunks = this.expo.chunkPushNotifications(messages);
+    let ticketCount = 0;
+
+    for (const chunk of chunks) {
+      try {
+        const tickets = await this.expo.sendPushNotificationsAsync(chunk);
+        ticketCount += tickets.length;
+
+        for (let index = 0; index < tickets.length; index++) {
+          const ticket = tickets[index];
+          if (ticket.status === 'error') {
+            this.logger.warn(
+              `Push ticket error: ${ticket.message} (${ticket.details?.error ?? 'unknown'})`,
+            );
+
+            if (ticket.details?.error === 'DeviceNotRegistered') {
+              const token = chunk[index]?.to;
+              if (typeof token === 'string') {
+                await this.clearInvalidPushToken(token);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to send push notification batch: ${error}`);
+      }
+    }
+
+    return ticketCount;
   }
 
   private async getRecipient(userId: string) {

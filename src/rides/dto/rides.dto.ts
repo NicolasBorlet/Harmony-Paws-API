@@ -64,6 +64,26 @@ export class CreateRideDto {
   @MaxLength(50)
   place?: string;
 
+  @ApiPropertyOptional({
+    example: 'Lyon',
+    description: 'Ville affichée sur les cartes de balade',
+    maxLength: 100,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  city?: string;
+
+  @ApiPropertyOptional({
+    example: 'Parc de la Tête d\'Or, 69006 Lyon',
+    description: 'Adresse précise du lieu de départ',
+    maxLength: 200,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  address?: string;
+
   @ApiProperty({
     enum: ActivityVisibility,
     example: ActivityVisibility.public,
@@ -178,6 +198,26 @@ export class UpdateRideDto {
   @IsString()
   @MaxLength(50)
   place?: string;
+
+  @ApiPropertyOptional({
+    example: 'Lyon',
+    description: 'Ville affichée sur les cartes de balade',
+    maxLength: 100,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  city?: string;
+
+  @ApiPropertyOptional({
+    example: 'Parc de la Tête d\'Or, 69006 Lyon',
+    description: 'Adresse précise du lieu de départ',
+    maxLength: 200,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  address?: string;
 
   @ApiPropertyOptional({
     enum: ActivityVisibility,

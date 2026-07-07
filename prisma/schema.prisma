@@ -270,6 +270,8 @@ model Activity {
   creatorId        String             @map("creator_id") @db.Uuid
   sourceRideId     String?            @map("source_ride_id") @db.Uuid
   place            String?            @db.VarChar(50)
+  city             String?            @db.VarChar(100)
+  address          String?            @db.VarChar(200)
   visibility       ActivityVisibility
   type             ActivityType
   style            ActivityStyle      @default(casual)
@@ -324,6 +326,8 @@ model Ride {
   id               String             @id @default(uuid()) @db.Uuid
   creatorId        String             @map("creator_id") @db.Uuid
   place            String?            @db.VarChar(50)
+  city             String?            @db.VarChar(100)
+  address          String?            @db.VarChar(200)
   visibility       ActivityVisibility
   type             ActivityType
   style            ActivityStyle      @default(casual)

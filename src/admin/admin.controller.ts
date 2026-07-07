@@ -32,6 +32,11 @@ import {
 } from '../email/dto/email.dto';
 import { EmailService } from '../email/email.service';
 import {
+  AdminBroadcastNotificationDto,
+  AdminBroadcastNotificationResponseDto,
+} from '../notifications/dto/notifications.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
   AdminCreateRowDto,
   AdminPaginatedResponseDto,
   AdminStatsResponseDto,
@@ -47,6 +52,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly emailService: EmailService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Post('emails/broadcast')
@@ -59,6 +65,18 @@ export class AdminController {
   @ApiStandardResponses({ unauthorized: true, forbidden: true })
   sendBroadcast(@Body() body: AdminBroadcastEmailDto) {
     return this.emailService.sendAdminBroadcast(body);
+  }
+
+  @Post('notifications/broadcast')
+  @ApiOperation({
+    summary: 'Envoi notification push en batch (admin)',
+    description:
+      'Diffuse une notification push personnalisée aux utilisateurs avec notifications push activées. Types : `app_update`, `promo`, `custom`.',
+  })
+  @ApiCreatedResponse({ type: AdminBroadcastNotificationResponseDto })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true })
+  sendNotificationBroadcast(@Body() body: AdminBroadcastNotificationDto) {
+    return this.notificationsService.sendAdminBroadcast(body);
   }
 
   @Get('stats')

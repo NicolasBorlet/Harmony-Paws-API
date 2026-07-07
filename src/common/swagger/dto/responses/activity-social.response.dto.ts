@@ -60,6 +60,12 @@ export class ActivityResponseDto {
   @ApiPropertyOptional({ example: 'Bois de Vincennes' })
   place?: string | null;
 
+  @ApiPropertyOptional({ example: 'Lyon' })
+  city?: string | null;
+
+  @ApiPropertyOptional({ example: 'Parc de la Tête d\'Or, 69006 Lyon' })
+  address?: string | null;
+
   @ApiProperty({ enum: ActivityVisibility, example: ActivityVisibility.public })
   visibility: ActivityVisibility;
 
