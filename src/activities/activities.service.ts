@@ -209,6 +209,14 @@ export class ActivitiesService {
 
       await this.linkDogsToActivity(tx, created.id, creatorId, dogIds);
 
+      await tx.conversation.create({
+        data: {
+          activityId: created.id,
+          title: created.place ?? 'Balade de groupe',
+          participants: { create: { userId: creatorId } },
+        },
+      });
+
       return tx.activity.findUniqueOrThrow({
         where: { id: created.id },
         include: {
@@ -492,6 +500,21 @@ export class ActivitiesService {
     // The sender must be the creator or an existing participant of the activity.
     await this.assertParticipant(activityId, senderId);
 
+    // Reject early if the activity is already full — no point inviting someone
+    // who could never accept. The hard guarantee is still enforced at accept time.
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { participantLimit: true },
+    });
+    if (activity?.participantLimit) {
+      const participantCount = await this.prisma.userActivity.count({
+        where: { activityId },
+      });
+      if (participantCount >= activity.participantLimit) {
+        throw new ConflictException('Participant limit reached');
+      }
+    }
+
     const receiver = await this.prisma.user.findUnique({
       where: { id: receiverId },
       select: { id: true },
@@ -554,9 +577,14 @@ export class ActivitiesService {
     }
 
     await this.assertDogsBelongToUser(dogIds, userId);
-    await this.enforceParticipantLimit(invitation.activity);
 
     const joinedDogs = await this.prisma.$transaction(async (tx) => {
+      await this.lockActivityRow(tx, invitation.activityId);
+      await this.enforceParticipantLimit(
+        tx,
+        invitation.activityId,
+        invitation.activity.participantLimit,
+      );
       await tx.activityInvitation.update({
         where: { id: invitationId },
         data: { status: ActivityInvitationStatus.accepted },
@@ -572,6 +600,7 @@ export class ActivitiesService {
         update: {},
       });
       await this.linkDogsToActivity(tx, invitation.activityId, userId, dogIds);
+      await this.addConversationParticipant(tx, invitation.activityId, userId);
       return this.getActivityDogsForUser(tx, invitation.activityId, userId);
     });
 
@@ -624,7 +653,7 @@ export class ActivitiesService {
       throw new BadRequestException('Activity is no longer open for joining');
     }
 
-    if (activity.date < new Date()) {
+    if (isActivityDayPassed(activity.date)) {
       throw new BadRequestException('Activity date has passed');
     }
 
@@ -636,13 +665,19 @@ export class ActivitiesService {
     }
 
     await this.assertDogsBelongToUser(dogIds, userId);
-    await this.enforceParticipantLimit(activity);
 
     const joinedDogs = await this.prisma.$transaction(async (tx) => {
+      await this.lockActivityRow(tx, activityId);
+      await this.enforceParticipantLimit(
+        tx,
+        activityId,
+        activity.participantLimit,
+      );
       await tx.userActivity.create({
         data: { userId, activityId },
       });
       await this.linkDogsToActivity(tx, activityId, userId, dogIds);
+      await this.addConversationParticipant(tx, activityId, userId);
       return this.getActivityDogsForUser(tx, activityId, userId);
     });
 
@@ -706,6 +741,91 @@ export class ActivitiesService {
     });
 
     return serialize(this.mapActivityDogs(fullActivity!));
+  }
+
+  async leaveActivity(activityId: string, userId: string) {
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { creatorId: true, status: true },
+    });
+    if (!activity) throw new NotFoundException('Activity not found');
+    if (activity.creatorId === userId) {
+      throw new ForbiddenException(
+        'The creator cannot leave the activity; delete it instead',
+      );
+    }
+
+    await this.removeParticipantInternal(activityId, userId, activity.status);
+
+    const payload = { userId, activityId };
+    this.events.emitToActivity(activityId, WS_EVENTS.PARTICIPANT_LEFT, payload);
+    this.events.emitToUser(
+      activity.creatorId,
+      WS_EVENTS.PARTICIPANT_LEFT,
+      payload,
+    );
+    return { success: true };
+  }
+
+  async removeParticipant(
+    activityId: string,
+    requesterId: string,
+    targetUserId: string,
+  ) {
+    await this.assertCreator(activityId, requesterId);
+    if (targetUserId === requesterId) {
+      throw new BadRequestException(
+        'The creator cannot be removed from the activity',
+      );
+    }
+
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { status: true },
+    });
+    if (!activity) throw new NotFoundException('Activity not found');
+
+    await this.removeParticipantInternal(
+      activityId,
+      targetUserId,
+      activity.status,
+    );
+
+    const payload = { userId: targetUserId, activityId };
+    this.events.emitToActivity(activityId, WS_EVENTS.PARTICIPANT_LEFT, payload);
+    this.events.emitToUser(targetUserId, WS_EVENTS.PARTICIPANT_LEFT, payload);
+    return { success: true };
+  }
+
+  private async removeParticipantInternal(
+    activityId: string,
+    userId: string,
+    status: ActivityStatus,
+  ) {
+    if (
+      status === ActivityStatus.in_progress ||
+      status === ActivityStatus.finished ||
+      status === ActivityStatus.archived
+    ) {
+      throw new BadRequestException(
+        'Cannot leave or remove participants once the activity has started',
+      );
+    }
+
+    const participant = await this.prisma.userActivity.findUnique({
+      where: { userId_activityId: { userId, activityId } },
+    });
+    if (!participant) {
+      throw new NotFoundException('Not a participant of this activity');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.activityDog.deleteMany({ where: { activityId, userId } });
+      await tx.userActivity.delete({
+        where: { userId_activityId: { userId, activityId } },
+      });
+      await this.removeConversationParticipant(tx, activityId, userId);
+    });
   }
 
   async saveLivePushToken(
@@ -870,21 +990,71 @@ export class ActivitiesService {
     }));
   }
 
-  private async enforceParticipantLimit(activity: {
-    participantLimit: number | null;
-    userActivities: Array<{ userId: string }>;
-    creatorId: string;
-  }) {
-    if (!activity.participantLimit) return;
+  /**
+   * Locks the activity row for the duration of the transaction so that
+   * concurrent joins/accepts are serialized and the participant limit can be
+   * enforced atomically (prevents two racing requests from both slipping past
+   * the limit check).
+   */
+  private async lockActivityRow(
+    tx: Prisma.TransactionClient,
+    activityId: string,
+  ) {
+    await tx.$queryRaw`SELECT id FROM activities WHERE id = ${activityId}::uuid FOR UPDATE`;
+  }
 
-    const participantIds = new Set(
-      activity.userActivities.map((ua) => ua.userId),
-    );
-    participantIds.add(activity.creatorId);
+  private async enforceParticipantLimit(
+    tx: Prisma.TransactionClient,
+    activityId: string,
+    participantLimit: number | null,
+  ) {
+    if (!participantLimit) return;
 
-    if (participantIds.size >= activity.participantLimit) {
+    // The creator always has a UserActivity row, so this count already
+    // includes them.
+    const participantCount = await tx.userActivity.count({
+      where: { activityId },
+    });
+
+    if (participantCount >= participantLimit) {
       throw new ConflictException('Participant limit reached');
     }
+  }
+
+  private async addConversationParticipant(
+    tx: Prisma.TransactionClient,
+    activityId: string,
+    userId: string,
+  ) {
+    const conversation = await tx.conversation.findUnique({
+      where: { activityId },
+      select: { id: true },
+    });
+    if (!conversation) return;
+
+    await tx.conversationParticipant.upsert({
+      where: {
+        conversationId_userId: { conversationId: conversation.id, userId },
+      },
+      create: { conversationId: conversation.id, userId },
+      update: {},
+    });
+  }
+
+  private async removeConversationParticipant(
+    tx: Prisma.TransactionClient,
+    activityId: string,
+    userId: string,
+  ) {
+    const conversation = await tx.conversation.findUnique({
+      where: { activityId },
+      select: { id: true },
+    });
+    if (!conversation) return;
+
+    await tx.conversationParticipant.deleteMany({
+      where: { conversationId: conversation.id, userId },
+    });
   }
 
   private async archivePastActivities(scope?: {

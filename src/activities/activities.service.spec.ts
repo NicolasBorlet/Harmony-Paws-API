@@ -41,6 +41,7 @@ describe('ActivitiesService — activity dogs', () => {
 
   beforeEach(async () => {
     tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
       activity: {
         create: jest.fn(),
         findUniqueOrThrow: jest.fn(),
@@ -51,7 +52,19 @@ describe('ActivitiesService — activity dogs', () => {
         findMany: jest.fn(),
       },
       activityInvitation: { update: jest.fn() },
-      userActivity: { create: jest.fn(), upsert: jest.fn() },
+      userActivity: {
+        create: jest.fn(),
+        upsert: jest.fn(),
+        delete: jest.fn(),
+        count: jest.fn().mockResolvedValue(1),
+      },
+      conversation: {
+        findUnique: jest.fn().mockResolvedValue({ id: 1n }),
+      },
+      conversationParticipant: {
+        upsert: jest.fn(),
+        deleteMany: jest.fn(),
+      },
     };
 
     prisma = {
@@ -66,6 +79,9 @@ describe('ActivitiesService — activity dogs', () => {
         findMany: jest.fn(),
       },
       activityInvitation: {
+        findUnique: jest.fn(),
+      },
+      userActivity: {
         findUnique: jest.fn(),
       },
     };
@@ -201,6 +217,9 @@ describe('ActivitiesService — activity dogs', () => {
           { userId: 'other-user' },
         ],
       });
+      // Inside the locked transaction the limit is checked against the live
+      // participant count.
+      (tx.userActivity.count as jest.Mock).mockResolvedValue(2);
 
       await expect(
         service.joinActivity(activityId, joinerId, [dogId]),
@@ -227,6 +246,95 @@ describe('ActivitiesService — activity dogs', () => {
       await expect(
         service.joinActivity(activityId, joinerId, [dogId]),
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('leaveActivity', () => {
+    it('rejects when the creator tries to leave', async () => {
+      (prisma.activity.findUnique as jest.Mock).mockResolvedValue({
+        creatorId,
+        status: ActivityStatus.not_started,
+      });
+
+      await expect(
+        service.leaveActivity(activityId, creatorId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects leaving once the activity has started', async () => {
+      (prisma.activity.findUnique as jest.Mock).mockResolvedValue({
+        creatorId,
+        status: ActivityStatus.in_progress,
+      });
+
+      await expect(
+        service.leaveActivity(activityId, joinerId),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('removes the participant, their dogs and chat access', async () => {
+      (prisma.activity.findUnique as jest.Mock).mockResolvedValue({
+        creatorId,
+        status: ActivityStatus.not_started,
+      });
+      (prisma.userActivity.findUnique as jest.Mock).mockResolvedValue({
+        id: 1n,
+      });
+
+      const result = await service.leaveActivity(activityId, joinerId);
+
+      expect(tx.activityDog.deleteMany).toHaveBeenCalledWith({
+        where: { activityId, userId: joinerId },
+      });
+      expect(tx.userActivity.delete).toHaveBeenCalled();
+      expect(tx.conversationParticipant.deleteMany).toHaveBeenCalled();
+      expect(events.emitToActivity).toHaveBeenCalledWith(
+        activityId,
+        expect.any(String),
+        expect.objectContaining({ userId: joinerId }),
+      );
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('removeParticipant', () => {
+    it('rejects when the requester is not the creator', async () => {
+      (prisma.activity.findUnique as jest.Mock).mockResolvedValue({
+        creatorId,
+      });
+
+      await expect(
+        service.removeParticipant(activityId, joinerId, 'someone'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects when the creator targets themselves', async () => {
+      (prisma.activity.findUnique as jest.Mock).mockResolvedValue({
+        creatorId,
+      });
+
+      await expect(
+        service.removeParticipant(activityId, creatorId, creatorId),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('removes the targeted participant', async () => {
+      (prisma.activity.findUnique as jest.Mock)
+        .mockResolvedValueOnce({ creatorId })
+        .mockResolvedValueOnce({ status: ActivityStatus.not_started });
+      (prisma.userActivity.findUnique as jest.Mock).mockResolvedValue({
+        id: 1n,
+      });
+
+      const result = await service.removeParticipant(
+        activityId,
+        creatorId,
+        joinerId,
+      );
+
+      expect(tx.userActivity.delete).toHaveBeenCalled();
+      expect(tx.conversationParticipant.deleteMany).toHaveBeenCalled();
+      expect(result).toEqual({ success: true });
     });
   });
 

@@ -149,6 +149,37 @@ export class ActivitiesController {
     return this.activitiesService.joinActivity(id, user.id, body.dogIds);
   }
 
+  @Delete(':id/leave')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Quitter une balade',
+    description:
+      'Un participant (hors créateur) quitte la balade avant son démarrage. Ses chiens et son accès au chat de groupe sont retirés.',
+  })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  leaveActivity(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.activitiesService.leaveActivity(id, user.id);
+  }
+
+  @Delete(':id/participants/:userId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Retirer un participant',
+    description:
+      'Seul le créateur peut retirer un participant, avant le démarrage de la balade.',
+  })
+  @ApiParam({ name: 'id', description: "UUID de l'activité" })
+  @ApiParam({ name: 'userId', description: 'UUID du participant à retirer' })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  removeParticipant(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.activitiesService.removeParticipant(id, user.id, userId);
+  }
+
   @Patch(':id/dogs')
   @ApiOperation({
     summary: 'Mettre à jour ses chiens sur une balade',
