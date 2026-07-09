@@ -298,6 +298,7 @@ model Activity {
   steps       Step[]
   stats       ActivityStats[]
   activityDogStats ActivityDogStats[]
+  conversation Conversation?
 
   @@index([creatorId])
   @@index([geohash])
@@ -503,11 +504,13 @@ model ActivityLivePushToken {
 // ---------------------------------------------------------------------------
 
 model Conversation {
-  id        BigInt   @id @default(autoincrement())
-  title     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         BigInt   @id @default(autoincrement())
+  title      String?
+  activityId String?  @unique @map("activity_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
+  activity     Activity?                 @relation(fields: [activityId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
   messages     Message[]
 

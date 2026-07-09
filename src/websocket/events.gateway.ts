@@ -17,6 +17,7 @@ export const WS_EVENTS = {
   INVITATION_CHANGED: 'invitation:changed',
   ACTIVITY_STATUS: 'activity:status',
   PARTICIPANT_JOINED: 'participant:joined',
+  PARTICIPANT_LEFT: 'participant:left',
   ACTIVITY_BANNER: 'activity:banner',
   BADGE_UNLOCKED: 'badge:unlocked',
 } as const;
