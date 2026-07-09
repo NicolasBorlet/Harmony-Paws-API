@@ -176,12 +176,10 @@ export class MessagesService {
 
     const participantUserIds = participants.map((p) => p.userId);
 
+    // Deliver to every participant's user room (each connected device joins
+    // `user:<id>` on connect). Emitting only here avoids the duplicate delivery
+    // that a parallel `conversation:` room emit would cause.
     this.events.emitToUsers(participantUserIds, WS_EVENTS.MESSAGE_NEW, message);
-    this.events.emitToConversation(
-      conversationId.toString(),
-      WS_EVENTS.MESSAGE_NEW,
-      message,
-    );
 
     for (const p of participants) {
       if (p.userId !== senderId) {
