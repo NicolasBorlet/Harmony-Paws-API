@@ -15,6 +15,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -28,9 +29,11 @@ import {
   ApiStandardResponses,
 } from '../common/swagger/decorators/api-common.decorator';
 import { HasDogResponseDto } from '../common/swagger/dto/responses/common.response.dto';
+import { ApiErrorResponseDto } from '../common/swagger/dto/api-error.dto';
 import {
   BehaviorResponseDto,
   BreedResponseDto,
+  CreateDogCompleteResponseDto,
   DiscoverDogsResponseDto,
   DogResponseDto,
   DogStatsResponseDto,
@@ -82,6 +85,49 @@ export class DogsController {
   @ApiStandardResponses({ unauthorized: true })
   hasDog(@CurrentUser() user: AuthUser) {
     return this.dogsService.userHasDog(user.id);
+  }
+
+  @Post('complete')
+  @ApiOperation({
+    summary: 'Créer un chien (étape 1/2)',
+    description:
+      'Crée le chien et retourne une URL d\'upload pour la photo. ' +
+      'La création n\'est effective qu\'après POST /dogs/:id/finalize une fois la photo uploadée.',
+  })
+  @ApiCreatedResponse({ type: CreateDogCompleteResponseDto })
+  @ApiStandardResponses({ unauthorized: true })
+  createComplete(
+    @CurrentUser() user: AuthUser,
+    @Body() body: CreateDogDto,
+  ) {
+    return this.dogsService.createComplete(user.id, user, body);
+  }
+
+  @Post(':id/finalize')
+  @ApiOperation({
+    summary: 'Finaliser la création d\'un chien (étape 2/2)',
+    description:
+      'Vérifie que la photo a bien été uploadée. ' +
+      'Si la photo est absente, le chien est supprimé et une erreur 422 est retournée.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID du chien',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiOkResponse({ type: DogResponseDto })
+  @ApiResponse({
+    status: 422,
+    description: 'Photo absente — le chien a été supprimé',
+    type: ApiErrorResponseDto,
+  })
+  @ApiStandardResponses({
+    unauthorized: true,
+    forbidden: true,
+    notFound: true,
+  })
+  finalizeCreation(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.dogsService.finalizeCreation(id, user.id);
   }
 
   @Get('breeds')

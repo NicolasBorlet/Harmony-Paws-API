@@ -2,15 +2,21 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { DogDominance, DogSex, Prisma } from '@prisma/client';
+import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { serialize } from '../common/utils/serialize';
+import { StorageService } from '../storage/storage.service';
 import { DiscoverDogsQueryDto } from './dto/dogs.dto';
 
 @Injectable()
 export class DogsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   private readonly dogInclude = {
     breed: true,
@@ -107,6 +113,38 @@ export class DogsService {
       include: this.dogInclude,
     });
     return serialize(dog);
+  }
+
+  async createComplete(
+    ownerId: string,
+    user: AuthUser,
+    data: {
+      name: string;
+      description?: string;
+      dominance?: DogDominance;
+      sex: DogSex;
+      age: number;
+      breedId: number;
+      behaviorIds?: number[];
+    },
+  ) {
+    const dog = await this.create(ownerId, data);
+    const imageKey = `${dog.id}.jpeg`;
+    const { url } = await this.storage.getUploadUrl('dogs', imageKey, user);
+    return serialize({ dog, uploadUrl: url });
+  }
+
+  async finalizeCreation(dogId: string, userId: string) {
+    await this.getById(dogId, userId);
+
+    const imageKey = `${dogId}.jpeg`;
+    const imageExists = await this.storage.objectExists('dogs', imageKey);
+    if (!imageExists) {
+      await this.prisma.dog.delete({ where: { id: dogId } });
+      throw new UnprocessableEntityException('Dog photo is required');
+    }
+
+    return this.getById(dogId, userId);
   }
 
   async update(

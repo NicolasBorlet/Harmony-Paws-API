@@ -80,6 +80,18 @@ export class DiscoverDogsResponseDto {
   has_more: boolean;
 }
 
+export class CreateDogCompleteResponseDto {
+  @ApiProperty({ type: DogResponseDto })
+  dog: DogResponseDto;
+
+  @ApiProperty({
+    example: 'https://minio.example.com/dogs/abc.jpeg?X-Amz-Signature=...',
+    description:
+      'URL présignée PUT valide 1 h. Uploader la photo avant POST /dogs/:id/finalize.',
+  })
+  upload_url: string;
+}
+
 export class DogStatsResponseDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   dog_id: string;

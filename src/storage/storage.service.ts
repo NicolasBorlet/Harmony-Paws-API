@@ -6,6 +6,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   GetObjectCommand,
+  HeadObjectCommand,
+  NotFound,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -94,6 +96,33 @@ export class StorageService {
     });
     const url = await getSignedUrl(this.client, command, { expiresIn: 3600 });
     return { url, bucket: safeBucket, key, contentType };
+  }
+
+  async objectExists(bucket: string, key: string): Promise<boolean> {
+    const safeBucket = this.validateBucket(bucket);
+    this.validateKey(key);
+    const { bucket: s3Bucket, key: s3Key } = resolveS3Location(
+      safeBucket,
+      key,
+      this.physicalBucketName,
+    );
+
+    try {
+      await this.client.send(
+        new HeadObjectCommand({ Bucket: s3Bucket, Key: s3Key }),
+      );
+      return true;
+    } catch (error) {
+      if (
+        error instanceof NotFound ||
+        (error as { name?: string }).name === 'NotFound' ||
+        (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+          ?.httpStatusCode === 404
+      ) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async getDownloadUrl(bucket: string, key: string, user: AuthUser) {
