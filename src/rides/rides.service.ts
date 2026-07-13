@@ -21,9 +21,12 @@ type RideStepInput = {
 
 type RideInput = {
   place?: string;
+  city?: string;
+  address?: string;
   visibility: ActivityVisibility;
   type: ActivityType;
   style?: ActivityStyle;
+  difficulty?: number;
   date?: string;
   duration?: string;
   participantLimit?: number;

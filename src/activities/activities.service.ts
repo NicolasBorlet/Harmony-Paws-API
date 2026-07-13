@@ -145,6 +145,7 @@ export class ActivitiesService {
       visibility: ActivityVisibility;
       type: ActivityType;
       style?: ActivityStyle;
+      difficulty?: number;
       date: string;
       duration?: string;
       participantLimit?: number;

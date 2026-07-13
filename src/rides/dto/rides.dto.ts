@@ -110,6 +110,18 @@ export class CreateRideDto {
   style?: ActivityStyle;
 
   @ApiPropertyOptional({
+    example: 3,
+    description: 'Difficulté de la randonnée (1 = facile, 5 = difficile)',
+    minimum: 1,
+    maximum: 5,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  difficulty?: number;
+
+  @ApiPropertyOptional({
     example: '2026-06-20T09:00:00.000Z',
     description: 'Date suggérée (optionnelle — l\'utilisateur choisit lors du clonage)',
   })
@@ -242,6 +254,18 @@ export class UpdateRideDto {
   @IsOptional()
   @IsEnum(ActivityStyle)
   style?: ActivityStyle;
+
+  @ApiPropertyOptional({
+    example: 3,
+    description: 'Difficulté de la randonnée (1 = facile, 5 = difficile)',
+    minimum: 1,
+    maximum: 5,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  difficulty?: number;
 
   @ApiPropertyOptional({
     example: '2026-06-20T09:00:00.000Z',

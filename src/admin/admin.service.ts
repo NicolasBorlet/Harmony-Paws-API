@@ -58,14 +58,16 @@ export class AdminService {
   }
 
   async getDashboardStats() {
-    const [users, dogs, breeds, behaviors] = await Promise.all([
+    const [users, dogs, breeds, behaviors, rides, places] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.dog.count(),
       this.prisma.breed.count(),
       this.prisma.behavior.count(),
+      this.prisma.ride.count(),
+      this.prisma.dogFriendlyPlace.count(),
     ]);
 
-    return { users, dogs, breeds, behaviors };
+    return { users, dogs, breeds, behaviors, rides, places };
   }
 
   async listTable(

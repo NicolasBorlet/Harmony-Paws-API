@@ -229,4 +229,10 @@ export class AdminStatsResponseDto {
 
   @ApiProperty()
   behaviors: number;
+
+  @ApiProperty()
+  rides: number;
+
+  @ApiProperty()
+  places: number;
 }
