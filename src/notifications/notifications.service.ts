@@ -32,6 +32,7 @@ export class NotificationsService {
     recipientId: string,
     senderId: string,
     content: string,
+    conversationId: string,
   ) {
     const [recipient, sender] = await Promise.all([
       this.getRecipient(recipientId),
@@ -57,7 +58,12 @@ export class NotificationsService {
     await this.deliverPush(recipient!.expoPushToken!, {
       title,
       body,
-      data: { type: 'message', senderId },
+      data: {
+        type: 'message',
+        senderId,
+        conversationId,
+        url: `harmony-paws://conversation/${conversationId}`,
+      },
       sound: 'default',
     });
   }

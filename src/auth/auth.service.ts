@@ -34,7 +34,7 @@ export class AuthService {
       include: { role: true },
     });
 
-    return this.issueTokens(user.id, user.email, user.role.name);
+    return this.issueTokensForUser(user.id, user.email, user.role.name);
   }
 
   async login(dto: LoginDto): Promise<AuthTokensDto> {
@@ -46,12 +46,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (!user.passwordHash) {
+      throw new UnauthorizedException(
+        'This account uses Google or Apple sign-in',
+      );
+    }
+
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.issueTokens(user.id, user.email, user.role.name);
+    return this.issueTokensForUser(user.id, user.email, user.role.name);
   }
 
   async refresh(refreshToken: string): Promise<AuthTokensDto> {
@@ -76,7 +82,7 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      return this.issueTokens(user.id, user.email, user.role.name);
+      return this.issueTokensForUser(user.id, user.email, user.role.name);
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -89,7 +95,7 @@ export class AuthService {
     });
   }
 
-  private async issueTokens(
+  async issueTokensForUser(
     userId: string,
     email: string,
     role: string,

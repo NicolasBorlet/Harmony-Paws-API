@@ -16,6 +16,8 @@ import {
   RefreshTokenDto,
   RegisterDto,
 } from './dto/auth.dto';
+import { AppleOAuthDto, GoogleOAuthDto } from './dto/oauth.dto';
+import { OAuthAuthService } from './oauth/oauth-auth.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import {
@@ -27,7 +29,10 @@ import { ApiErrorResponseDto } from '../common/swagger/dto/api-error.dto';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly oauthAuthService: OAuthAuthService,
+  ) {}
 
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -97,5 +102,48 @@ export class AuthController {
   @ApiStandardResponses({ unauthorized: true })
   logout(@CurrentUser() user: AuthUser): Promise<void> {
     return this.authService.logout(user.id);
+  }
+
+  @Post('oauth/google')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Se connecter avec Google',
+    description:
+      'Vérifie un ID token Google Sign-In natif et émet une paire JWT. Limité à **10 requêtes/minute**.',
+  })
+  @ApiOkResponse({
+    description: 'Authentification Google réussie',
+    type: AuthTokensDto,
+  })
+  @ApiConflictResponse({
+    description: 'Conflit de liaison de compte',
+    type: ApiErrorResponseDto,
+  })
+  @ApiStandardResponses({ unauthorized: true, tooManyRequests: true })
+  signInWithGoogle(@Body() dto: GoogleOAuthDto): Promise<AuthTokensDto> {
+    return this.oauthAuthService.signInWithGoogle(dto.idToken);
+  }
+
+  @Post('oauth/apple')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Se connecter avec Apple',
+    description:
+      'Vérifie un identity token Sign in with Apple et émet une paire JWT. Limité à **10 requêtes/minute**.',
+  })
+  @ApiOkResponse({
+    description: 'Authentification Apple réussie',
+    type: AuthTokensDto,
+  })
+  @ApiConflictResponse({
+    description: 'Conflit de liaison de compte',
+    type: ApiErrorResponseDto,
+  })
+  @ApiStandardResponses({ unauthorized: true, tooManyRequests: true })
+  signInWithApple(@Body() dto: AppleOAuthDto): Promise<AuthTokensDto> {
+    return this.oauthAuthService.signInWithApple(dto.identityToken, {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+    });
   }
 }

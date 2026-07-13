@@ -109,6 +109,12 @@ enum DogFriendlyPlaceStatus {
 // Users & auth
 // ---------------------------------------------------------------------------
 
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  APPLE
+}
+
 model Role {
   id        Int      @id @default(autoincrement())
   name      String   @unique @db.VarChar(50)
@@ -122,7 +128,8 @@ model Role {
 model User {
   id            String   @id @default(uuid()) @db.Uuid
   email         String   @unique
-  passwordHash  String   @map("password_hash")
+  passwordHash  String?  @map("password_hash")
+  emailVerified Boolean  @default(false) @map("email_verified")
   refreshToken  String?  @map("refresh_token")
   roleId        Int      @default(1) @map("role_id")
   firstName     String?  @map("first_name") @db.VarChar(100)
@@ -167,8 +174,24 @@ model User {
   activityDogs            ActivityDog[]
   activityDogStats      ActivityDogStats[]
   createdDogFriendlyPlaces DogFriendlyPlace[] @relation("DogFriendlyPlaceCreator")
+  authIdentities           UserAuthIdentity[]
 
   @@map("users")
+}
+
+model UserAuthIdentity {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  provider       AuthProvider
+  providerUserId String       @map("provider_user_id") @db.VarChar(255)
+  providerEmail  String?      @map("provider_email") @db.VarChar(255)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("user_auth_identities")
 }
 
 model Customer {

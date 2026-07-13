@@ -191,6 +191,7 @@ export class MessagesService {
           p.userId,
           senderId,
           content,
+          String(conversationId),
         );
       }
     }
