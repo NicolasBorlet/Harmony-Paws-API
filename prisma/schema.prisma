@@ -636,6 +636,8 @@ model Document {
   id           BigInt       @id @default(autoincrement())
   dogId        String       @map("dog_id") @db.Uuid
   fileName     String?      @map("file_name")
+  storageKey   String?      @map("storage_key")
+  mimeType     String?      @map("mime_type")
   documentType DocumentType @map("document_type")
   place        String?
   reason       String?

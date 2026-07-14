@@ -16,17 +16,12 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
-import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
-import { HealthService } from './health.service';
 import {
-  CreateHealthDocumentDto,
-  CreateHealthReminderDto,
-  CreateMeasurementDto,
-  CreateVaccinationDto,
-  UpdateHealthReminderDto,
-} from './dto/health.dto';
+  AuthUser,
+  CurrentUser,
+} from '../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { ParseBigIntPipe } from '../common/pipes/parse-bigint.pipe';
 import {
   ApiJwtAuth,
   ApiStandardResponses,
@@ -37,6 +32,14 @@ import {
   HealthReminderResponseDto,
   VaccinationResponseDto,
 } from '../common/swagger/dto/responses/health.response.dto';
+import {
+  CreateHealthDocumentDto,
+  CreateHealthReminderDto,
+  CreateMeasurementDto,
+  CreateVaccinationDto,
+  UpdateHealthReminderDto,
+} from './dto/health.dto';
+import { HealthService } from './health.service';
 
 @ApiTags('health')
 @Controller('health')
@@ -46,7 +49,7 @@ export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
   @Get('dogs/:dogId/vaccinations')
-  @ApiOperation({ summary: 'Lister les vaccinations d\'un chien' })
+  @ApiOperation({ summary: "Lister les vaccinations d'un chien" })
   @ApiParam({ name: 'dogId', description: 'UUID du chien' })
   @ApiOkResponse({ type: [VaccinationResponseDto] })
   @ApiStandardResponses({ unauthorized: true, forbidden: true })
@@ -101,7 +104,8 @@ export class HealthController {
   @Post('dogs/:dogId/documents')
   @ApiOperation({
     summary: 'Créer une entrée document',
-    description: 'Enregistre les métadonnées ; uploader le fichier via POST /storage/documents/…/upload-url.',
+    description:
+      'Enregistre les métadonnées et retourne une URL présignée pour uploader le fichier.',
   })
   @ApiParam({ name: 'dogId', description: 'UUID du chien' })
   @ApiCreatedResponse({ type: HealthDocumentResponseDto })
@@ -111,7 +115,49 @@ export class HealthController {
     @CurrentUser() user: AuthUser,
     @Body() body: CreateHealthDocumentDto,
   ) {
-    return this.healthService.createDocument(dogId, user.id, body);
+    return this.healthService.createDocument(dogId, user.id, user, body);
+  }
+
+  @Post('dogs/:dogId/documents/:id/finalize')
+  @ApiOperation({
+    summary: 'Finaliser un document',
+    description:
+      'Vérifie que le fichier a bien été uploadé sur le bucket documents.',
+  })
+  @ApiParam({ name: 'dogId', description: 'UUID du chien' })
+  @ApiParam({
+    name: 'id',
+    description: 'Identifiant du document',
+    example: '1',
+  })
+  @ApiOkResponse({ type: HealthDocumentResponseDto })
+  @ApiStandardResponses({
+    unauthorized: true,
+    forbidden: true,
+    notFound: true,
+  })
+  finalizeDocument(
+    @Param('dogId') dogId: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.healthService.finalizeDocument(dogId, id, user.id);
+  }
+
+  @Delete('documents/:id')
+  @ApiOperation({ summary: 'Supprimer un document vétérinaire' })
+  @ApiParam({
+    name: 'id',
+    description: 'Identifiant du document',
+    example: '1',
+  })
+  @ApiNoContentResponse({ description: 'Document supprimé' })
+  @ApiStandardResponses({ unauthorized: true, forbidden: true, notFound: true })
+  deleteDocument(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.healthService.deleteDocument(id, user.id);
   }
 
   @Get('dogs/:dogId/reminders')

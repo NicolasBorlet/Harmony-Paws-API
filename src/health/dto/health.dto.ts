@@ -3,6 +3,7 @@ import { DocumentType } from '@prisma/client';
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -11,6 +12,15 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+
+export const HEALTH_DOCUMENT_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const;
+
+export type HealthDocumentMimeType = (typeof HEALTH_DOCUMENT_MIME_TYPES)[number];
 
 export class CreateVaccinationDto {
   @ApiProperty({
@@ -92,6 +102,14 @@ export class CreateHealthDocumentDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
+
+  @ApiProperty({
+    example: 'application/pdf',
+    description: 'Type MIME du fichier à uploader',
+    enum: HEALTH_DOCUMENT_MIME_TYPES,
+  })
+  @IsIn(HEALTH_DOCUMENT_MIME_TYPES)
+  mimeType: HealthDocumentMimeType;
 }
 
 export class CreateHealthReminderDto {

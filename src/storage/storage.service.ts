@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   NotFound,
@@ -123,6 +124,19 @@ export class StorageService {
       }
       throw error;
     }
+  }
+
+  async deleteObject(bucket: string, key: string): Promise<void> {
+    const safeBucket = this.validateBucket(bucket);
+    this.validateKey(key);
+    const { bucket: s3Bucket, key: s3Key } = resolveS3Location(
+      safeBucket,
+      key,
+      this.physicalBucketName,
+    );
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: s3Bucket, Key: s3Key }),
+    );
   }
 
   async getDownloadUrl(bucket: string, key: string, user: AuthUser) {

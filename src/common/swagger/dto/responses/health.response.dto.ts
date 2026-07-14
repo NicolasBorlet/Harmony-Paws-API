@@ -48,6 +48,12 @@ export class HealthDocumentResponseDto {
   @ApiPropertyOptional({ example: 'ordonnance-mars.pdf' })
   file_name?: string | null;
 
+  @ApiPropertyOptional({ example: '42.pdf' })
+  storage_key?: string | null;
+
+  @ApiPropertyOptional({ example: 'application/pdf' })
+  mime_type?: string | null;
+
   @ApiProperty({ enum: DocumentType, example: DocumentType.prescription })
   document_type: DocumentType;
 
